@@ -93,6 +93,15 @@ client.on('message', async (msg) => {
   const lowerChat = msg.body.toLowerCase()
   const args = msg.body.trim().split(/ +/).slice(1)
   const workbook = XLSX.readFile("test.xlsx")
+  const isWriting = JSON.parse(fs.readFileSync("temp/from.json"))
+
+  if (msg.from == JSON.parse(fs.readFileSync("temp/from.json"))) {
+    try {
+      msg.reply("Test")
+    } catch (err) {
+      console.log("[ERROR] " + err)
+    }
+  }
 
   try {
     if (msg.body.startsWith("!")) {
@@ -103,8 +112,13 @@ client.on('message', async (msg) => {
         break
 
         case prefix + "start":
-          msg.reply("Input process started!\n\nPlease input a date with dd/mm/yy format, else it'll be automatically set to today (" + moment().tz("Israel").format("DD/MM/YY") + ").")
-          msg.sendMessage(msg.from, "Available list:\n")
+          if (isWriting != []) {
+            msg.reply("Someone else is using this command. Please wait a moment!")
+          } else {
+            msg.reply("Input process started!\n\nPlease input a date with dd/mm/yy format, else it'll be automatically set to today (" + moment().tz("Israel").format("DD/MM/YY") + ").")
+            client.sendMessage(msg.from, "Available list:\n")
+            fs.writeFileSync("temp/from.json", JSON.stringify(msg.from))
+          }
         break
 
         case prefix + "date":
