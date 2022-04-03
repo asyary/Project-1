@@ -91,13 +91,54 @@ client.on('message', async (msg) => {
   const prefix = '!'
   const isCmd = msg.body.slice(1).trim().split(/ +/).shift().toLowerCase()
   const lowerChat = msg.body.toLowerCase()
-  const args = msg.body.trim().split(/ +/).slice(1)
+  const args = lowerChat.trim().split(/ +/)
   const workbook = XLSX.readFile("test.xlsx")
   const isWriting = JSON.parse(fs.readFileSync("temp/from.json"))
 
-  if (msg.from == JSON.parse(fs.readFileSync("temp/from.json"))) {
+  function errorDate() {
+    msg.reply("Invalid date format!")
+  }
+  function dateCompare(arr) {
+
+  }
+  function init(thor) {
+    fs.writeFileSync("temp/from.json", JSON.stringify(thor))
+    fs.writeFileSync("temp/date.json", JSON.stringify(moment().tz("Israel").format("DD/MM/YY")))
+    if (!fs.existsSync("database/" + thor)) {
+      fs.mkdirSync("database/" + thor)
+    }
+  }
+  function inp() {
+    // All processing input is here
+    let thor = fs.readFileSync("temp/from.json")
+    let daDate = fs.readFileSync("temp/date.json")
+    let val = fs.readFileSync("temp/value.json")
+    // Compare dates
+    
+  }
+  function setExcel() {
+    // All setup for the excel (coloring) is here
+
+  }
+  function uploadExcel() {
+
+  }
+
+  if (msg.author == JSON.parse(fs.readFileSync("temp/from.json"))) {
     try {
-      msg.reply("Test")
+      if (/^\d?\d\/\d?\d\/\d\d$/gm.test(msg.body)) {
+        let inputDate = msg.body
+        let splitDate = inputDate.split("/")
+        if (splitDate[0] <= 31 && splitDate[1] <= 12) {
+          fs.writeFileSync("temp/date.json", JSON.stringify(msg.body))
+          msg.reply("Date updated!")
+        } else {
+          errorDate()
+        }
+      } else if (args[0] == "add") {
+        let val = fs.readFileSync("temp/value.json")
+        
+      }
     } catch (err) {
       console.log("[ERROR] " + err)
     }
@@ -105,25 +146,23 @@ client.on('message', async (msg) => {
 
   try {
     if (msg.body.startsWith("!")) {
-      console.log(prefix + isCmd + " from " + msg.from)
+      console.log(prefix + isCmd + " from " + msg.author)
+      if (msg.author == undefined) {
+        msg.reply("This bot can only be used in a group!")
+        return
+      }
       switch(lowerChat) {
         case prefix + 'ping':
           msg.reply("Pong!")
         break
 
         case prefix + "start":
-          if (isWriting != []) {
+          if (JSON.parse(fs.readFileSync("temp/from.json")) != "") {
             msg.reply("Someone else is using this command. Please wait a moment!")
           } else {
             msg.reply("Input process started!\n\nPlease input a date with dd/mm/yy format, else it'll be automatically set to today (" + moment().tz("Israel").format("DD/MM/YY") + ").")
             client.sendMessage(msg.from, "Available list:\n")
-            fs.writeFileSync("temp/from.json", JSON.stringify(msg.from))
-          }
-        break
-
-        case prefix + "date":
-          if (args.length == 0) {
-            msg.reply("Use ")
+            init(msg.author)
           }
         break
 
@@ -132,7 +171,7 @@ client.on('message', async (msg) => {
           for (const sheetName of workbook.SheetNames) {
             worksheets[sheetName] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
           }
-          console.log(JSON.stringify(worksheets.Sheet1))
+          console.log(worksheets.Sheet1)
         break
 
         case prefix + "logout":
@@ -143,8 +182,25 @@ client.on('message', async (msg) => {
           })()
         break
 
+        case prefix + "test":
+          const jsonTest = fs.readFileSync("temp/temp.json")
+          const iniWb = XLSX.utils.book_new()
+          var iniWs = XLSX.utils.json_to_sheet(jsonTest)
+          XLSX.utils.book_append_sheet(iniWb, iniWs, "Sheesh")
+          XLSX.writeFile(iniWb, "Hm.xlsx")
+        break
+
         case prefix + "finish":
-          msg.reply("Upload succeeded! Upload engaging.")
+          if (msg.author == fs.readFileSync("temp/from.json")) {
+            msg.reply("Input succeeded! Upload engaging.")
+            inp()
+            fs.writeFileSync("temp/from.json", "[]")
+            fs.writeFileSync("temp/date.json", "[]")
+          } else if (fs.readFileSync("temp/from.json") == "") {
+            msg.reply("No input! Use !start to start input.")
+          } else {
+            msg.reply("Someone else is using this command. Please wait a moment!")
+          }
         break
 
         default:
