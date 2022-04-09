@@ -25,9 +25,9 @@
     "pm2": "^5.2.0",
     "puppeteer": "^13.5.2",
     "qrcode": "^1.4.4",
-    "sheetjs-style": "^0.15.8",
     "socket.io": "^4.4.1",
-    "whatsapp-web.js": "latest"
+    "whatsapp-web.js": "latest",
+    "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.7"

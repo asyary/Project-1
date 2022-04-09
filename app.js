@@ -10,7 +10,7 @@ const fileUpload = require('express-fileupload');
 const axios = require('axios');
 const mime = require('mime-types');
 const moment = require('moment-timezone');
-const XLSX = require("sheetjs-style");
+const XLSX = require("xlsx-js-style");
 
 const port = process.env.PORT || 8000;
 
@@ -92,7 +92,6 @@ client.on('message', async (msg) => {
   const isCmd = msg.body.slice(1).trim().split(/ +/).shift().toLowerCase()
   const lowerChat = msg.body.toLowerCase()
   const args = lowerChat.trim().split(/ +/)
-  const workbook = XLSX.readFile("test.xlsx")
   const isWriting = JSON.parse(fs.readFileSync("temp/from.json"))
   const realThor = msg.author.replace('@c.us', '')
 
@@ -112,9 +111,10 @@ client.on('message', async (msg) => {
   }
   function init(thor) {
     fs.writeFileSync("temp/from.json", JSON.stringify(thor))
+    fs.writeFileSync("temp/value.json", JSON.stringify({}))
     fs.writeFileSync("temp/date.json", JSON.stringify(moment().tz("Israel").format("DD/MM/YY")))
     if (!fs.existsSync("database/" + thor)) {
-      fs.mkdirSync("database/" + thor)
+      fs.mkdirSync("database/" + thor + "/log", {recursive:true})
       fs.writeFileSync("database/" + thor + "/master.json", "[]")
       fs.writeFileSync("database/" + thor + "/date.json", "[]")
     }
@@ -148,7 +148,7 @@ client.on('message', async (msg) => {
       fs.writeFileSync("database/" + thor + "/master.json", JSON.stringify(userMaster))
       dateMaster.push(daDate)
       fs.writeFileSync("database/" + thor + "/date.json", JSON.stringify(dateMaster))
-      uploadExcel()
+      createSummary()
     } else {
       // Compare dates
       for (let i = 0; i < dateMaster.length; i++) {
@@ -156,23 +156,25 @@ client.on('message', async (msg) => {
           // Somewhere in the middle
           //console.log(dateMaster[i])
           dateMaster.splice(i, 0, daDate)
+          fs.writeFileSync("database/" + msg.author + "/date.json", JSON.stringify(dateMaster))
           objWhereAt(userMaster, daDate, i)
           break
         } else if (i == dateMaster.length-1 && compareDate(dateMaster[i], daDate)) {
           // At the end
           dateMaster.splice(i+1, 0, daDate)
+          fs.writeFileSync("database/" + msg.author + "/date.json", JSON.stringify(dateMaster))
           objWhereAt(userMaster, daDate, i+1)
           break
         } else if (i == dateMaster.length-1 && compareDate(dateMaster[0], daDate)) {
           // At the beginning
           dateMaster.splice(0, 0, daDate)
+          fs.writeFileSync("database/" + msg.author + "/date.json", JSON.stringify(dateMaster))
           objWhereAt(userMaster, daDate, 0)
           break
         }
       }
-      fs.writeFileSync("database/" + msg.author + "/date.json", JSON.stringify(dateMaster))
       // Set object (master.json) for setExcel() req
-      // setExcel()
+      // setExcel(JSON.parse(fs.readFileSync("database/" + thor + "/master.json")))
     }
   }
   function objWhereAt(obj, deDate, where) {
@@ -189,7 +191,7 @@ client.on('message', async (msg) => {
       if (val[obj[i][0][1]] != undefined) {
         obj[i].splice(where+1, 0, [deDate, val[obj[i][0][1]]])
       } else {
-        obj[i].splice(where+1, 0, [deDate, ""])
+        obj[i].splice(where+1, 0, [deDate, "0"])
       }
     }
     for (let i = 0; i < obj.length; i++) {
@@ -200,7 +202,7 @@ client.on('message', async (msg) => {
         let newObj = {}
         newObj.List = valKey[i]
         datoMaster.map(x => {
-          newObj[x] = ""
+          newObj[x] = "0"
         })
         newObj[deDate] = val[valKey[i]]
         //newObj[valKey[i]] = val[valKey[i]]
@@ -208,15 +210,90 @@ client.on('message', async (msg) => {
       }
     }
     fs.writeFileSync("database/" + msg.author + "/master.json", JSON.stringify(obj))
+    createSummary()
   }
-  function setExcel() {
+  function createSummary() {
+    let daMaster = JSON.parse(fs.readFileSync("database/" + msg.author + "/master.json"))
+    let datetoMaster = JSON.parse(fs.readFileSync("database/" + msg.author + "/date.json"))
+      fs.writeFileSync("database/" + msg.author + "/log/" + moment().tz("Israel").format("Do MMM YYYY kk mm ss") + ".json", JSON.stringify(daMaster))
+    let sumFunc = {}
+    sumFunc.List = "summary"
+    let sumArr = []
+    let sumArrTemp = []
+    for (let i = 0; i < datetoMaster.length; i++) {
+      for (let j = 0; j < daMaster.length; j++) {
+        sumArrTemp.push(parseInt(daMaster[j][datetoMaster[i]]))
+      }
+      sumArr.push(sumArrTemp.reduce((partialSum, a) => partialSum + a, 0))
+      sumFunc[datetoMaster[i]] = sumArr[i].toString()
+      sumArrTemp = []
+    }
+    daMaster.push(sumFunc)
+    setExcel(daMaster)
+  }
+  function setExcel(daJason) {
     // All setup for the excel (coloring) is here
+    let realDate = JSON.parse(fs.readFileSync("database/" + msg.author + "/date.json"))
+    let red = "F4B084"
+    let green = "A9D08E"
+    // let yellow = "FFFF00"
+    let iniWb = XLSX.utils.book_new()
+    let iniWs = XLSX.utils.json_to_sheet(daJason)
+    // console.log(daJason)
+    // console.log(iniWs)
+    for (let i = 0; i < daJason.length; i++) {
+      for (let j = 1; j < Object.keys(daJason[i]).length-1; j++) {
+        console.log("Is " + daJason[i][realDate[j]] + " less than " + daJason[i][realDate[j-1]])
+        if (daJason[i][realDate[j]] < daJason[i][realDate[j-1]]) {
+          // Output green
+          let col = String.fromCharCode(j+66)
+          let row = i+2
+          let colUndRow = col+row
+          console.log("True, " + colUndRow)
+          iniWs[colUndRow].s = {
+            fill: {
+              fgColor: {
+                rgb: green
+              }
+            }
+          }
+        } else if (daJason[i][realDate[j]] > daJason[i][realDate[j-1]]) {
+          // Output red
+          let col = String.fromCharCode(j+66)
+          let row = i+2
+          let colUndRow = col+row
+          console.log("False, " + colUndRow)
+          iniWs[colUndRow].s = {
+            fill: {
+              fgColor: {
+                rgb: red
+              }
+            }
+          }
+        }
+      }
+    }
+    // let iniWsFull = columnAndRow(iniWs)
+    // iniWs["B2"].s = {
+    //   fill: {
+    //     fgColor: {
+    //       rgb: "F4B084"
+    //     }
+    //   }
+    // }
+    XLSX.utils.book_append_sheet(iniWb, iniWs, "Summary")
+    XLSX.writeFile(iniWb, "database/" + msg.author + "/master.xlsx")
+    XLSX.writeFile(iniWb, "database/" + msg.author + "/log/" + moment().tz("Israel").format("Do MMM YYYY kk mm ss") + ".xlsx")
 
-    uploadExcel()
+    uploadExcel(false)
   }
-  function uploadExcel() {
-
-    resetTemp()
+  async function uploadExcel(isDownload) {
+    let whatTime = moment().tz("Israel").format("MMM YYYY")
+    const media = await new MessageMedia("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fs.readFileSync("database/" + msg.author + "/master.xlsx", "base64"), whatTime + " " + msg.author.replace("@c.us", "") + ".xlsx")
+    await client.sendMessage(msg.from, media, {sendMediaAsDocument: true})
+    if (!isDownload) {
+      resetTemp()
+    }
   }
   function resetTemp() {
     fs.writeFileSync("temp/from.json", "[]")
@@ -226,15 +303,6 @@ client.on('message', async (msg) => {
   function inpReset() {
     fs.writeFileSync("temp/date.json", JSON.stringify(moment().tz("Israel").format("DD/MM/YY")))
     fs.writeFileSync("temp/value.json", "{}")
-  }
-  function isRed() {
-
-  }
-  function isYellow() {
-
-  }
-  function isGreen() {
-    
   }
   function compareDate(date1, date2) {	
     return moment(date1, "DD/MM/YY").valueOf() < moment(date2, "DD/MM/YY").valueOf()
@@ -271,6 +339,12 @@ client.on('message', async (msg) => {
         } else {
           errorOut("input")
         }
+      } else if (args[0] == "reset") {
+        inpReset()
+        msg.reply("Value and date is reset!")
+      } else if (args[0] == "cancel") {
+        resetTemp()
+        msg.reply("Canceled!")
       }
     } catch (err) {
       console.log("[ERROR] " + err)
@@ -295,7 +369,16 @@ client.on('message', async (msg) => {
           } else {
             msg.reply("Input process started!\n\nPlease input a date with dd/mm/yy format, else it'll be automatically set to today (" + moment().tz("Israel").format("DD/MM/YY") + ").")
             if (fs.existsSync("database/" + msg.author)) {
-              client.sendMessage(msg.from, "Available list:\n")
+              let uMaster = JSON.parse(fs.readFileSync("database/" + msg.author + "/master.json"))
+              let mastArr = []
+              for (let i = 0; i < uMaster.length; i++) {
+                var isEnd = "\n"
+                if (i == uMaster.length-1) {
+                  var isEnd = ""
+                }
+                mastArr.push((i+1) + ". " + uMaster[i].List + isEnd)
+              }
+              client.sendMessage(msg.from, "Available list:\n" + mastArr.join(""))
             }
             await init(msg.author)
           }
@@ -303,6 +386,10 @@ client.on('message', async (msg) => {
 
         case prefix + "debug":
           inp()
+        break
+
+        case prefix + "nyeh":
+          console.log(fs.readFileSync("database/" + msg.author + "/master.xlsx", "base64"))
         break
 
         case prefix + "logout":
@@ -313,34 +400,26 @@ client.on('message', async (msg) => {
           })()
         break
 
-        case prefix + "reset":
-          if (checkInp(msg.author)) {
-            inpReset()
-            msg.reply("Value and date is reset!")
-          }
-        break
-
-        case prefix + "cancel":
-          if (checkInp(msg.author)) {
-            resetTemp()
-            msg.reply("Canceled!")
-          }
-        break
-
-        case prefix + "test":
-          // const jsonTest = JSON.parse(fs.readFileSync("temp/temp.json"))
-          // const iniWb = XLSX.utils.book_new()
-          // var iniWs = XLSX.utils.json_to_sheet(jsonTest)
-          // XLSX.utils.book_append_sheet(iniWb, iniWs, "Sheesh")
-          // XLSX.writeFile(iniWb, "Hm.xlsx")
-        break
-
         case prefix + "ngetest":
           const jsonTest = JSON.parse(fs.readFileSync("database/" + msg.author + "/master.json"))
           const iniWb = XLSX.utils.book_new()
           var iniWs = XLSX.utils.json_to_sheet(jsonTest)
+          iniWs["B2"].s = {
+            fill: {
+              fgColor: {
+                rgb: "F4B084"
+              }
+            }
+          }
+          console.log(iniWs)
+          msg.reply(iniWs)
           XLSX.utils.book_append_sheet(iniWb, iniWs, "Sheesh")
           XLSX.writeFile(iniWb, "Hmm.xlsx")
+        break
+
+        case prefix + "download":
+          msg.reply("Please wait!")
+          uploadExcel(true)
         break
 
         case prefix + "finish":
