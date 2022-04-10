@@ -115,10 +115,12 @@ client.on('message', async (msg) => {
     fs.writeFileSync("temp/from.json", JSON.stringify(thor))
     fs.writeFileSync("temp/value.json", JSON.stringify({}))
     fs.writeFileSync("temp/date.json", JSON.stringify(moment().tz("Israel").format("DD/MM/YY")))
-    if (!fs.existsSync("database/" + thor)) {
+    fs.writeFileSync("temp/desc.json", JSON.stringify({}))
+    if (!fs.existsSync("database/" + thor + "/master.json")) {
       fs.mkdirSync("database/" + thor + "/log", {recursive:true})
       fs.writeFileSync("database/" + thor + "/master.json", "[]")
       fs.writeFileSync("database/" + thor + "/date.json", "[]")
+      fs.writeFileSync("database/" + thor + "/desc.json", "[]")
     }
   }
   function checkInp(thor) {
@@ -137,9 +139,11 @@ client.on('message', async (msg) => {
     let thor = JSON.parse(fs.readFileSync("temp/from.json"))
     let daDate = JSON.parse(fs.readFileSync("temp/date.json"))
     let val = JSON.parse(fs.readFileSync("temp/value.json"))
+    let desc = JSON.parse(fs.readFileSync("temp/desc.json"))
     // let userExcel = thor.replace('@c.us', '')
     let dateMaster = JSON.parse(fs.readFileSync("database/" + thor + "/date.json"))
     let userMaster = JSON.parse(fs.readFileSync("database/" + thor + "/master.json"))
+    let descMaster = JSON.parse(fs.readFileSync("database/" + thor + "/desc.json"))
 
     if (userMaster == "") {
       for (let i = 0; i < Object.keys(val).length; i++) {
@@ -150,8 +154,13 @@ client.on('message', async (msg) => {
       fs.writeFileSync("database/" + thor + "/master.json", JSON.stringify(userMaster))
       dateMaster.push(daDate)
       fs.writeFileSync("database/" + thor + "/date.json", JSON.stringify(dateMaster))
+      let randomArr = []
+      randomArr.push(desc)
+      fs.writeFileSync("database/" + thor + "/desc.json", JSON.stringify(randomArr))
       createSummary()
     } else {
+      descMaster.push(desc)
+      fs.writeFileSync("database/" + thor + "/desc.json", JSON.stringify(descMaster))
       // Compare dates
       for (let i = 0; i < dateMaster.length; i++) {
         if (compareDate(daDate, dateMaster[i])) {
@@ -175,8 +184,6 @@ client.on('message', async (msg) => {
           break
         }
       }
-      // Set object (master.json) for setExcel() req
-      // setExcel(JSON.parse(fs.readFileSync("database/" + thor + "/master.json")))
     }
   }
   function objWhereAt(obj, deDate, where) {
@@ -252,10 +259,21 @@ client.on('message', async (msg) => {
           let row = i+2
           let colUndRow = col+row
           // console.log("True, " + colUndRow)
-          iniWs[colUndRow].s = {
-            fill: {
-              fgColor: {
-                rgb: green
+          if (daJason[i].List == "summary" && j == 1) {
+            // Fake positive!
+            iniWs[colUndRow].s = {
+              fill: {
+                fgColor: {
+                  rgb: red
+                }
+              }
+            }
+          } else {
+            iniWs[colUndRow].s = {
+              fill: {
+                fgColor: {
+                  rgb: green
+                }
               }
             }
           }
@@ -265,25 +283,54 @@ client.on('message', async (msg) => {
           let row = i+2
           let colUndRow = col+row
           // console.log("False, " + colUndRow)
-          iniWs[colUndRow].s = {
-            fill: {
-              fgColor: {
-                rgb: red
+          if (daJason[i].List == "summary" && j == 1) {
+            // Fake positive!
+            iniWs[colUndRow].s = {
+              fill: {
+                fgColor: {
+                  rgb: green
+                }
+              }
+            }
+          } else {
+            iniWs[colUndRow].s = {
+              fill: {
+                fgColor: {
+                  rgb: red
+                }
               }
             }
           }
         }
       }
     }
-    // let iniWsFull = columnAndRow(iniWs)
-    // iniWs["B2"].s = {
-    //   fill: {
-    //     fgColor: {
-    //       rgb: "F4B084"
-    //     }
-    //   }
-    // }
     XLSX.utils.book_append_sheet(iniWb, iniWs, "Summary")
+    // Create another slide for each different months
+    let separated = separator(realDate)
+    let daDesc = JSON.parse(fs.readFileSync("database/" + msg.author + "/desc.json"))
+    for (let i = 0; i < separated.length; i++) {
+      let otwWs = []
+      let wsTemp = {}
+      let daName = moment(separated[i][0], "DD/MM/YY").format("M_YY")
+      for (let j = 0; j < separated[i].length; j++) {
+        let descKey = Object.keys(daDesc[j])
+        let descVal = Object.keys(daDesc[j])
+        for (let k = 0; k < descKey.length; k++) {
+          wsTemp.Date = separated[i][j]
+          wsTemp.Label = descKey[k]
+          for (let l = 0; l < daJason.length; l++) {
+            if (daJason[l].List == descKey[k]) {
+              wsTemp.value = daJason[l][separated[i][j]]
+            }
+          }
+          wsTemp.Desc = descVal[k]
+        }
+        otwWs.push(wsTemp)
+        wsTemp = {}
+      }
+      daWs = XLSX.utils.json_to_sheet(otwWs)
+      XLSX.utils.book_append_sheet(iniWb, daWs, daName)
+    }
     XLSX.writeFile(iniWb, "database/" + msg.author + "/master.xlsx")
     XLSX.writeFile(iniWb, "database/" + msg.author + "/log/" + moment().tz("Israel").format("Do MMM YYYY kk mm ss") + ".xlsx")
 
@@ -300,11 +347,13 @@ client.on('message', async (msg) => {
   function resetTemp() {
     fs.writeFileSync("temp/from.json", "[]")
     fs.writeFileSync("temp/date.json", "[]")
+    fs.writeFileSync("temp/desc.json", "[]")
     fs.writeFileSync("temp/value.json", "{}")
   }
   function inpReset() {
     fs.writeFileSync("temp/date.json", JSON.stringify(moment().tz("Israel").format("DD/MM/YY")))
     fs.writeFileSync("temp/value.json", "{}")
+    fs.writeFileSync("temp/desc.json", "[]")
   }
   function resetExcel() {
     uploadExcel(false)
@@ -316,10 +365,29 @@ client.on('message', async (msg) => {
   function compareDate(date1, date2) {	
     return moment(date1, "DD/MM/YY").valueOf() < moment(date2, "DD/MM/YY").valueOf()
   }
+  function separator(arr) {
+    let res = []
+    let arrTemp = []
+    for (let i = 1; i < arr.length; i++) {
+      if (moment(arr[i], "DD/MM/YY").isSame(moment(arr[i-1], "DD/MM/YY"), "month")) {
+        arrTemp.push(arr[i-1])
+      } else {
+        arrTemp.push(arr[i-1])
+        res.push(arrTemp)
+        arrTemp = []
+      }
+      if (i == arr.length-1) {
+        arrTemp.push(arr[i])
+        res.push(arrTemp)
+      }
+    }
+    return res
+  }
 
   if (msg.author == JSON.parse(fs.readFileSync("temp/from.json"))) {
     try {
       let val = JSON.parse(fs.readFileSync("temp/value.json"))
+      let desc = JSON.parse(fs.readFileSync("temp/desc.json"))
       if (/^\d\d\/\d\d\/\d\d$/gm.test(msg.body)) {
         let inputDate = msg.body
         let splitDate = inputDate.split("/")
@@ -334,6 +402,16 @@ client.on('message', async (msg) => {
         if (/^(\+|\-)?\d+$/g.test(args[2])) {
           val[args[1]] = args[2]
           fs.writeFileSync("temp/value.json", JSON.stringify(val))
+          if (args[3]) {
+            let arrTemp = []
+            for (let i = 3; i < args.length; i++) {
+              arrTemp.push(args[i])
+            }
+            desc[args[1]] = arrTemp.join(" ")
+          } else {
+            desc[args[1]] = ""
+          }
+          fs.writeFileSync("temp/desc.json", JSON.stringify(desc))
           msg.reply("Label *" + args[1] + "* has been added with the value of *" + args[2] + "*!")
         } else {
           errorOut("input")
@@ -341,7 +419,9 @@ client.on('message', async (msg) => {
       } else if (args[0] == "remove") {
         if (/^[A-Za-z]+$/g.test(args[1]) && args.length == 2 && val[args[1]]) {
           delete val[args[1]]
+          delete desc[args[1]]
           fs.writeFileSync("temp/value.json", JSON.stringify(val))
+          fs.writeFileSync("temp/desc.json", JSON.stringify(desc))
           msg.reply("Input *" + args[1] + "* has been canceled!")
         } else if (!val[args[1]]) {
           msg.reply("Input *" + args[1] + "* does not exist!")
@@ -367,7 +447,7 @@ client.on('message', async (msg) => {
         msg.reply("This bot can only be used in a group!")
         return
       }
-      switch(lowerChat) {
+      switch(args[0]) {
         case prefix + 'ping':
           msg.reply("Pong!")
         break
@@ -383,7 +463,7 @@ client.on('message', async (msg) => {
             errorOut("use")
           } else {
             msg.reply("Input process started!\n\nPlease input a date with dd/mm/yy format, else it'll be automatically set to today (" + moment().tz("Israel").format("DD/MM/YY") + ").")
-            if (fs.existsSync("database/" + msg.author)) {
+            if (fs.existsSync("database/" + msg.author + "/master.json")) {
               let uMaster = JSON.parse(fs.readFileSync("database/" + msg.author + "/master.json"))
               let mastArr = []
               for (let i = 0; i < uMaster.length; i++) {
@@ -412,11 +492,7 @@ client.on('message', async (msg) => {
         break
 
         case prefix + "ngetest":
-          const jsonTest = JSON.parse(fs.readFileSync("database/" + msg.author + "/master.json"))
-          const iniWb = XLSX.utils.book_new()
-          var iniWs = XLSX.utils.json_to_sheet(jsonTest)
-          XLSX.utils.book_append_sheet(iniWb, iniWs, "Sheesh")
-          XLSX.writeFile(iniWb, "Hmm.xlsx")
+          console.log(separator(["22/06/15", "25/06/15", "27/06/15", "29/06/15", "01/07/15", "03/07/15", "04/07/15"]))
         break
 
         case prefix + "download":
