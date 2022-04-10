@@ -94,8 +94,6 @@ client.on('message', async (msg) => {
   const isCmd = msg.body.slice(1).trim().split(/ +/).shift().toLowerCase()
   const lowerChat = msg.body.toLowerCase()
   const args = lowerChat.trim().split(/ +/)
-  const isWriting = JSON.parse(fs.readFileSync("temp/from.json"))
-  const realThor = msg.author.replace('@c.us', '')
 
   // Kumpulan function
   function errorOut(arg) {
