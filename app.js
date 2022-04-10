@@ -245,13 +245,13 @@ client.on('message', async (msg) => {
     // console.log(iniWs)
     for (let i = 0; i < daJason.length; i++) {
       for (let j = 1; j < Object.keys(daJason[i]).length-1; j++) {
-        console.log("Is " + daJason[i][realDate[j]] + " less than " + daJason[i][realDate[j-1]])
+        // console.log("Is " + daJason[i][realDate[j]] + " less than " + daJason[i][realDate[j-1]])
         if (daJason[i][realDate[j]] < daJason[i][realDate[j-1]]) {
           // Output green
           let col = String.fromCharCode(j+66)
           let row = i+2
           let colUndRow = col+row
-          console.log("True, " + colUndRow)
+          // console.log("True, " + colUndRow)
           iniWs[colUndRow].s = {
             fill: {
               fgColor: {
@@ -264,7 +264,7 @@ client.on('message', async (msg) => {
           let col = String.fromCharCode(j+66)
           let row = i+2
           let colUndRow = col+row
-          console.log("False, " + colUndRow)
+          // console.log("False, " + colUndRow)
           iniWs[colUndRow].s = {
             fill: {
               fgColor: {
@@ -400,10 +400,6 @@ client.on('message', async (msg) => {
 
         case prefix + "debug":
           inp()
-        break
-
-        case prefix + "nyeh":
-          console.log(fs.readFileSync("database/" + msg.author + "/master.xlsx", "base64"))
         break
 
         case prefix + "logout":
