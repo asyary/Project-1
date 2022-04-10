@@ -310,6 +310,7 @@ client.on('message', async (msg) => {
     fs.unlinkSync("database/" + msg.author + "/master.json")
     fs.unlinkSync("database/" + msg.author + "/date.json")
     fs.unlinkSync("database/" + msg.author + "/master.xlsx")
+    uploadExcel(false)
     client.sendMessage(msg.from, "Your Excel has been reset!")
   }
   function compareDate(date1, date2) {	
