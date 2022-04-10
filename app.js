@@ -18,6 +18,8 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
 
+const menu = JSON.parse(fs.readFileSync("menu.json"))
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -304,6 +306,12 @@ client.on('message', async (msg) => {
     fs.writeFileSync("temp/date.json", JSON.stringify(moment().tz("Israel").format("DD/MM/YY")))
     fs.writeFileSync("temp/value.json", "{}")
   }
+  function resetExcel() {
+    fs.unlinkSync("database/" + msg.author + "/master.json")
+    fs.unlinkSync("database/" + msg.author + "/date.json")
+    fs.unlinkSync("database/" + msg.author + "/master.xlsx")
+    client.sendMessage(msg.from, "Your Excel has been reset!")
+  }
   function compareDate(date1, date2) {	
     return moment(date1, "DD/MM/YY").valueOf() < moment(date2, "DD/MM/YY").valueOf()
   }
@@ -363,6 +371,12 @@ client.on('message', async (msg) => {
           msg.reply("Pong!")
         break
 
+        case prefix + "help":
+        case prefix + "menu":
+          msg.reply(menu[0])
+          client.sendMessage(msg.from, menu[1])
+        break
+
         case prefix + "start":
           if (JSON.parse(fs.readFileSync("temp/from.json")) != "") {
             errorOut("use")
@@ -404,30 +418,32 @@ client.on('message', async (msg) => {
           const jsonTest = JSON.parse(fs.readFileSync("database/" + msg.author + "/master.json"))
           const iniWb = XLSX.utils.book_new()
           var iniWs = XLSX.utils.json_to_sheet(jsonTest)
-          iniWs["B2"].s = {
-            fill: {
-              fgColor: {
-                rgb: "F4B084"
-              }
-            }
-          }
-          console.log(iniWs)
-          msg.reply(iniWs)
           XLSX.utils.book_append_sheet(iniWb, iniWs, "Sheesh")
           XLSX.writeFile(iniWb, "Hmm.xlsx")
         break
 
         case prefix + "download":
-          msg.reply("Please wait!")
-          uploadExcel(true)
+          if (fs.existsSync("database/" + msg.author + "/master.xlsx")) {
+            msg.reply("Please wait!")
+            uploadExcel(true)
+          } else {
+            msg.reply("You haven't created an Excel yet!\nUse !start to create one.")
+          }
         break
 
         case prefix + "finish":
           if (checkInp(msg.author)) {
             msg.reply("Input succeeded! Upload engaging.")
             inp()
+          }
+        break
+
+        case prefix + "reset":
+          if (fs.existsSync("database/" + msg.author + "/master.xlsx")) {
+            msg.reply("Resetting Excel!")
+            resetExcel()
           } else {
-            errorOut("use")
+            msg.reply("You haven't created an Excel yet!\nUse !start to create one.")
           }
         break
 
