@@ -250,10 +250,21 @@ client.on('message', async (msg) => {
           let row = i+2
           let colUndRow = col+row
           // console.log("True, " + colUndRow)
-          iniWs[colUndRow].s = {
-            fill: {
-              fgColor: {
-                rgb: green
+          if (daJason[i].List == "summary" && j == 1) {
+            // Fake positive!
+            iniWs[colUndRow].s = {
+              fill: {
+                fgColor: {
+                  rgb: red
+                }
+              }
+            }
+          } else {
+            iniWs[colUndRow].s = {
+              fill: {
+                fgColor: {
+                  rgb: green
+                }
               }
             }
           }
@@ -263,10 +274,21 @@ client.on('message', async (msg) => {
           let row = i+2
           let colUndRow = col+row
           // console.log("False, " + colUndRow)
-          iniWs[colUndRow].s = {
-            fill: {
-              fgColor: {
-                rgb: red
+          if (daJason[i].List == "summary" && j == 1) {
+            // Fake positive!
+            iniWs[colUndRow].s = {
+              fill: {
+                fgColor: {
+                  rgb: green
+                }
+              }
+            }
+          } else {
+            iniWs[colUndRow].s = {
+              fill: {
+                fgColor: {
+                  rgb: red
+                }
               }
             }
           }
