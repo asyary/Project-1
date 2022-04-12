@@ -59,6 +59,12 @@ client.on('group_join', async (res) => {
   init(res.chatId)
 })
 
+function init(thor) {
+  fs.mkdirSync("database/" + thor + "/log", {recursive:true})
+  fs.writeFileSync("database/" + thor + "/master.json", "[]")
+  fs.writeFileSync("database/" + thor + "/date.json", "[]")
+}
+
 client.on('message', async (msg) => {
   // Downloading media
   if (msg.hasMedia) {
@@ -100,6 +106,7 @@ client.on('message', async (msg) => {
   const masterTime = moment().tz("Israel").format("DD/MM/YY")
   const thor = msg.from
   const menu = JSON.parse(fs.readFileSync("menu.json"))
+  const chat = await client.getChatById(msg.from)
 
   // Kumpulan function
   function errorOut(arg) {
@@ -111,11 +118,6 @@ client.on('message', async (msg) => {
         msg.reply("Invalid input!")
       break
     }
-  }
-  function init(thor) {
-    fs.mkdirSync("database/" + thor + "/log", {recursive:true})
-    fs.writeFileSync("database/" + thor + "/master.json", "[]")
-    fs.writeFileSync("database/" + thor + "/date.json", "[]")
   }
   function inp(daDate, data) {
     // All processing input is here
@@ -137,7 +139,7 @@ client.on('message', async (msg) => {
     } else {
       for (let i = 0; i < dataKey.length; i++) {
         for (let j = 0; j < userMaster.length; j++) {
-          if (dataKey.includes(userMaster[j].List)) {
+          if (dataKey[i] == userMaster[j].List) {
             // If exist a label, try to write on it
             userMaster[j][daDate] = dataVal[i]
             break
@@ -230,16 +232,26 @@ client.on('message', async (msg) => {
     XLSX.writeFile(iniWb, "database/" + msg.from + "/master.xlsx")
     XLSX.writeFile(iniWb, "database/" + msg.from + "/log/" + moment().tz("Israel").format("Do MMM YYYY kk mm ss") + ".xlsx")
 
-    msg.reply("Input succeeded!")
+    //msg.reply("Input succeeded!")
     //uploadExcel()
   }
   async function uploadExcel() {
-    if (fs.existsSync("database/" + msg.from + "/master.xlsx")) {
+    if (!fs.existsSync("database/" + msg.from + "/master.xlsx")) {
       msg.reply("You don't have an Excel yet!")
       return
     }
+    let arrz = []
+    let newArrz = []
+    chat.groupMetadata.participants.map(x => {
+      arrz.push(x.id._serialized)
+    })
+    arrz.pop()
+    for (let con of arrz) {
+      newArrz.push(await (await client.getContactById(con)).pushname)
+    }
+    let nameAdd = newArrz.join(" ")
     let whatTime = moment().tz("Israel").format("MMM YYYY")
-    const media = await new MessageMedia("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fs.readFileSync("database/" + msg.from + "/master.xlsx", "base64"), whatTime + " " + msg.from.replace("@c.us", "") + ".xlsx")
+    const media = await new MessageMedia("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fs.readFileSync("database/" + msg.from + "/master.xlsx", "base64"), whatTime + " " + nameAdd + ".xlsx")
     await client.sendMessage(msg.from, media, {sendMediaAsDocument: true})
   }
   function resetExcel() {
@@ -257,11 +269,12 @@ client.on('message', async (msg) => {
     for (let i = 0; i < deMaster.length; i++) {
       if (deMaster[i].List == arg && deMaster[i][daTime]) {
         deMaster[i][daTime] = ""
-        msg.reply("Value from label *" + arg + "* has been removed!")
+        fs.writeFileSync("database/" + msg.from + "/master.json", JSON.stringify(deMaster))
         checkEmp()
+        return true
       }
     }
-    msg.reply("Label *" + arg + "* from *" + daTime + "* did not exist!")
+    return false
   }
   function checkEmp() {
     // Check if there's a date or label that's empty, then remove it
@@ -279,12 +292,13 @@ client.on('message', async (msg) => {
     for (let i = 0; i < masterDate.length; i++) {
       let dateTemp = []
       for (let j = 0; j < disMaster.length; j++) {
-        dateTemp.push(masterDate[j][masterDate[i]])
+        dateTemp.push(disMaster[j][masterDate[i]])
       }
       if (dateTemp.every((val, i, arr) => val === arr[0]) && dateTemp[0] == "") {
         for (let j = 0; j < disMaster.length; j++) {
           delete disMaster[j][masterDate[i]]
         }
+        masterDate.splice(i, 1)
       }
     }
     fs.writeFileSync("database/" + msg.from + "/master.json", JSON.stringify(disMaster))
@@ -309,11 +323,15 @@ client.on('message', async (msg) => {
       if (finalData != {}) {
         inp(masterTime, finalData)
       }
-    } else if (args[0] == "remove") {
-      if (/^\d\d\/\d\d\/\d\d$/.test(args[2])) {
-        removeInp(args[1], args[2])
-      } else {
-        removeInp(args[1], undefined)
+      msg.reply("Input succeeded!")
+    } else if (/remove [^\s]+\n?/.test(lowerChat)) {
+      let newGood = lowerChat.replaceAll("remove ", "").split(/\n/gm)
+      for (let i = 0; i < newGood.length; i++) {
+        if (removeInp(newGood[i], masterTime)) {
+          msg.reply("Value from label *" + newGood[i] + "* has been removed!")
+        } else {
+          msg.reply("Label *" + newGood[i] + "* from *" + masterTime + "* did not exist!")
+        }
       }
     }
   } catch (err) {
@@ -339,7 +357,14 @@ client.on('message', async (msg) => {
         break
 
         case prefix + "debug":
-          console.log(masterTime)
+          let arrz = []
+          chat.groupMetadata.participants.map(x => {
+            arrz.push(x.id._serialized)
+          })
+          console.log(chat.name + "\n" + arrz)
+          for (let con of arrz) {
+            console.log(await (await client.getContactById(con)).pushname)
+          }
         break
 
         case prefix + "logout":
