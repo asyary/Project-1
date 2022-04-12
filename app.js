@@ -145,8 +145,19 @@ client.on('message', async (msg) => {
             // If the label don't exist, create it
             let tempData = {}
             tempData.List = dataKey[i]
+            for (let k = 0; k < dateMaster.length; k++) {
+              tempData[dateMaster[k]] = ""
+            }
             tempData[daDate] = dataVal[i]
             userMaster.push(tempData)
+          }
+        }
+      }
+      // Check if there's an empty space, then create an empty obj
+      for (let i = 0; i < dateMaster.length; i++) {
+        for (let j = 0; j < userMaster.length; j++) {
+          if (!userMaster[j][dateMaster[i]]) {
+            userMaster[j][dateMaster[i]] = ""
           }
         }
       }
