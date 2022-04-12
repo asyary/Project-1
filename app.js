@@ -60,7 +60,9 @@ client.on('group_join', async (res) => {
 })
 
 function init(thor) {
-  fs.mkdirSync("database/" + thor + "/log", {recursive:true})
+  if (!fs.existsSync("database/" + thor + "/log")){
+    fs.mkdirSync("database/" + thor + "/log", {recursive:true})
+  }
   fs.writeFileSync("database/" + thor + "/master.json", "[]")
   fs.writeFileSync("database/" + thor + "/date.json", "[]")
 }
@@ -258,7 +260,10 @@ client.on('message', async (msg) => {
     uploadExcel()
     fs.unlinkSync("database/" + msg.from + "/master.json")
     fs.unlinkSync("database/" + msg.from + "/date.json")
-    fs.unlinkSync("database/" + msg.from + "/master.xlsx")
+    if (fs.existsSync("database/" + msg.from + "/master.xlsx")){
+      fs.unlinkSync("database/" + msg.from + "/master.xlsx")
+    }
+    init(msg.from)
     client.sendMessage(msg.from, "Your Excel has been reset!")
   }
   function removeInp(arg, daTime) {
@@ -306,7 +311,7 @@ client.on('message', async (msg) => {
 
     createSummary()
   }
-  if (!fs.existsSync("database/" + msg.from) && msg.author != undefined) {
+  if (!fs.existsSync("database/" + msg.from + "/master.json") && msg.author != undefined) {
     init(msg.from)
   }
   try {
@@ -388,7 +393,7 @@ client.on('message', async (msg) => {
             msg.reply("Please wait!")
             uploadExcel()
           } else {
-            msg.reply("You haven't created an Excel yet!\nUse !start to create one.")
+            msg.reply("You haven't created an Excel yet!")
           }
         break
 
@@ -397,7 +402,7 @@ client.on('message', async (msg) => {
             msg.reply("Resetting Excel!")
             resetExcel()
           } else {
-            msg.reply("You haven't created an Excel yet!\nUse !start to create one.")
+            msg.reply("You haven't created an Excel yet!")
           }
         break
 
