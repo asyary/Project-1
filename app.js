@@ -11,6 +11,7 @@ const axios = require('axios');
 const mime = require('mime-types');
 const moment = require('moment-timezone');
 const XLSX = require("xlsx-js-style");
+const schedule = require('node-schedule');
 
 const port = process.env.PORT || 8000;
 
@@ -66,6 +67,49 @@ function init(thor) {
   fs.writeFileSync("database/" + thor + "/master.json", "[]")
   fs.writeFileSync("database/" + thor + "/date.json", "[]")
 }
+async function uploadExcel(msgFrom, msgId) {
+  if (!fs.existsSync("database/" + msgFrom + "/master.xlsx") || msgId) {
+    client.sendMessage(msgFrom, "You don't have an Excel yet!", {quotedMessageId:msgId})
+    return
+  }
+  if (JSON.parse(fs.readFileSync("database/" + msgFrom + "/master.json")) != "") {
+    let arrz = []
+    let newArrz = []
+    let chat = await client.getChatById(msgFrom)
+    chat.groupMetadata.participants.map(x => {
+      arrz.push(x.id._serialized)
+    })
+    arrz.pop()
+    for (let con of arrz) {
+      newArrz.push(await (await client.getContactById(con)).pushname)
+    }
+    let nameAdd = newArrz.join(" ")
+    let whatTime = moment().tz("Israel").format("MMM YYYY")
+    const media = await new MessageMedia("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fs.readFileSync("database/" + msgFrom + "/master.xlsx", "base64"), whatTime + " " + nameAdd + ".xlsx")
+    await client.sendMessage(msgFrom, media, {sendMediaAsDocument: true})
+  }
+}
+async function cronReset() {
+  let readFile = await fs.readdirSync("database/")
+  readFile.splice(readFile.indexOf(".gitkeep"), 1)
+  for (let msgFrom of readFile) {
+    await sleep(2500)
+    resetExcel(msgFrom, undefined)
+  }
+}
+function resetExcel(msgFrom, msgId) {
+  fs.unlinkSync("database/" + msgFrom + "/master.json")
+  fs.unlinkSync("database/" + msgFrom + "/date.json")
+  if (fs.existsSync("database/" + msgFrom + "/master.xlsx")){
+    uploadExcel(msgFrom, msgId)
+    fs.unlinkSync("database/" + msgFrom + "/master.xlsx")
+  }
+  init(msgFrom)
+  client.sendMessage(msgFrom, "Your Excel has been reset!")
+}
+schedule.scheduleJob({rule: "*/2 * * * *", tz:"Israel"}, () => {
+  cronReset()
+})
 
 client.on('message', async (msg) => {
   // Downloading media
@@ -111,16 +155,6 @@ client.on('message', async (msg) => {
   const chat = await client.getChatById(msg.from)
 
   // Kumpulan function
-  function errorOut(arg) {
-    switch(arg) {
-      case "date":
-        msg.reply("Invalid date format!")
-      break
-      case "input":
-        msg.reply("Invalid input!")
-      break
-    }
-  }
   function inp(daDate, data) {
     // All processing input is here
     let dateMaster = JSON.parse(fs.readFileSync("database/" + thor + "/date.json"))
@@ -237,35 +271,6 @@ client.on('message', async (msg) => {
     //msg.reply("Input succeeded!")
     //uploadExcel()
   }
-  async function uploadExcel() {
-    if (!fs.existsSync("database/" + msg.from + "/master.xlsx")) {
-      msg.reply("You don't have an Excel yet!")
-      return
-    }
-    let arrz = []
-    let newArrz = []
-    chat.groupMetadata.participants.map(x => {
-      arrz.push(x.id._serialized)
-    })
-    arrz.pop()
-    for (let con of arrz) {
-      newArrz.push(await (await client.getContactById(con)).pushname)
-    }
-    let nameAdd = newArrz.join(" ")
-    let whatTime = moment().tz("Israel").format("MMM YYYY")
-    const media = await new MessageMedia("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fs.readFileSync("database/" + msg.from + "/master.xlsx", "base64"), whatTime + " " + nameAdd + ".xlsx")
-    await client.sendMessage(msg.from, media, {sendMediaAsDocument: true})
-  }
-  function resetExcel() {
-    uploadExcel()
-    fs.unlinkSync("database/" + msg.from + "/master.json")
-    fs.unlinkSync("database/" + msg.from + "/date.json")
-    if (fs.existsSync("database/" + msg.from + "/master.xlsx")){
-      fs.unlinkSync("database/" + msg.from + "/master.xlsx")
-    }
-    init(msg.from)
-    client.sendMessage(msg.from, "Your Excel has been reset!")
-  }
   function removeInp(arg, daTime) {
     let deMaster = JSON.parse(fs.readFileSync("database/" + msg.from + "/master.json"))
     if (!daTime) {
@@ -345,7 +350,7 @@ client.on('message', async (msg) => {
 
   try {
     if (msg.body.startsWith("!")) {
-      console.log(prefix + isCmd + " from " + msg.author)
+      console.log(prefix + isCmd + " from " + msg.author.replace("@c.us", ""))
       if (msg.author == undefined) {
         msg.reply("This bot can only be used in a group!")
         return
@@ -362,14 +367,7 @@ client.on('message', async (msg) => {
         break
 
         case prefix + "debug":
-          let arrz = []
-          chat.groupMetadata.participants.map(x => {
-            arrz.push(x.id._serialized)
-          })
-          console.log(chat.name + "\n" + arrz)
-          for (let con of arrz) {
-            console.log(await (await client.getContactById(con)).pushname)
-          }
+          cronReset()
         break
 
         case prefix + "logout":
@@ -391,7 +389,7 @@ client.on('message', async (msg) => {
         case prefix + "download":
           if (fs.existsSync("database/" + msg.from + "/master.xlsx")) {
             msg.reply("Please wait!")
-            uploadExcel()
+            uploadExcel(msg.from, msg.id)
           } else {
             msg.reply("You haven't created an Excel yet!")
           }
@@ -400,7 +398,7 @@ client.on('message', async (msg) => {
         case prefix + "reset":
           if (fs.existsSync("database/" + msg.from + "/master.xlsx")) {
             msg.reply("Resetting Excel!")
-            resetExcel()
+            resetExcel(msg.from, msg.id)
           } else {
             msg.reply("You haven't created an Excel yet!")
           }
