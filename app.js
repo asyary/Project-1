@@ -23,6 +23,21 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function dumpError(err) {
+  if (typeof err === 'object') {
+    if (err.message) {
+      console.log('\nMessage: ' + err.message)
+    }
+    if (err.stack) {
+      console.log('\nStacktrace:')
+      console.log('====================')
+      console.log(err.stack);
+    }
+  } else {
+    console.log('dumpError :: argument is not an object');
+  }
+}
+
 app.use(express.json());
 app.use(express.urlencoded({
   extended: true
@@ -66,10 +81,13 @@ function init(thor) {
   }
   fs.writeFileSync("database/" + thor + "/master.json", "[]")
   fs.writeFileSync("database/" + thor + "/date.json", "[]")
+  fs.writeFileSync("database/" + thor + "/action.json", "[]")
 }
-async function uploadExcel(msgFrom, msgId) {
-  if (!fs.existsSync("database/" + msgFrom + "/master.xlsx") || msgId) {
-    client.sendMessage(msgFrom, "You don't have an Excel yet!", {quotedMessageId:msgId})
+async function uploadExcel(msgFrom, isCron) {
+  if (!fs.existsSync("database/" + msgFrom + "/master.xlsx") && !isCron) {
+    client.sendMessage(msgFrom, "You don't have an Excel yet!")
+    return
+  } else if (!fs.existsSync("database/" + msgFrom + "/master.xlsx") && isCron) {
     return
   }
   if (JSON.parse(fs.readFileSync("database/" + msgFrom + "/master.json")) != "") {
@@ -94,20 +112,26 @@ async function cronReset() {
   readFile.splice(readFile.indexOf(".gitkeep"), 1)
   for (let msgFrom of readFile) {
     await sleep(2500)
-    resetExcel(msgFrom, undefined)
+    resetExcel(msgFrom, true)
   }
 }
-function resetExcel(msgFrom, msgId) {
+async function resetExcel(msgFrom, isCron) {
+  if (fs.existsSync("database/" + msgFrom + "/master.xlsx")){
+    if (isCron) {
+      await uploadExcel(msgFrom, true)
+      fs.unlinkSync("database/" + msgFrom + "/master.xlsx")
+    } else {
+      await uploadExcel(msgFrom, false)
+      fs.unlinkSync("database/" + msgFrom + "/master.xlsx")
+    }
+  }
   fs.unlinkSync("database/" + msgFrom + "/master.json")
   fs.unlinkSync("database/" + msgFrom + "/date.json")
-  if (fs.existsSync("database/" + msgFrom + "/master.xlsx")){
-    uploadExcel(msgFrom, msgId)
-    fs.unlinkSync("database/" + msgFrom + "/master.xlsx")
-  }
+  fs.unlinkSync("database/" + msgFrom + "/action.json")
   init(msgFrom)
   client.sendMessage(msgFrom, "Your Excel has been reset!")
 }
-schedule.scheduleJob({rule: "*/2 * * * *", tz:"Israel"}, () => {
+schedule.scheduleJob({rule: "0 0 1 * *", tz:"Israel"}, () => {
   cronReset()
 })
 
@@ -153,6 +177,12 @@ client.on('message', async (msg) => {
   const thor = msg.from
   const menu = JSON.parse(fs.readFileSync("menu.json"))
   const chat = await client.getChatById(msg.from)
+
+  // Just force exit if is not a group
+  if (msg.author == undefined) {
+    msg.reply("This bot can only be used in a group!")
+    return
+  }
 
   // Kumpulan function
   function inp(daDate, data) {
@@ -264,7 +294,9 @@ client.on('message', async (msg) => {
       }
     }
     XLSX.utils.book_append_sheet(iniWb, iniWs, "Summary")
-    // Add another sheet if date named json exist
+    // Add another sheet if date named json exist (M_YY)
+    // Add Summary_M_YY
+    // Setup action.json 
     XLSX.writeFile(iniWb, "database/" + msg.from + "/master.xlsx")
     XLSX.writeFile(iniWb, "database/" + msg.from + "/log/" + moment().tz("Israel").format("Do MMM YYYY kk mm ss") + ".xlsx")
 
@@ -320,10 +352,11 @@ client.on('message', async (msg) => {
     init(msg.from)
   }
   try {
-    let uMaster = JSON.parse(fs.readFileSync("database/" + msg.from + "/master.json"))
-    if (/add [^\s]+ \d+\n?/.test(lowerChat)) {
+    let desc = JSON.parse(fs.readFileSync("database/" + msg.from + "/action.json"))
+    if (/^add [^\s]+ \d+ ?[^\n]+?\n?$/gm.test(lowerChat)) {
       // args[2] must exist, args[2] must be a number
-      let newLower = lowerChat.replaceAll("add ", "").split(/\n/gm)
+      newLowerChat = lowerChat.match(/^add [^\s]+ \d+ ?[^\n]+?\n?$/gm).join("\n")
+      let newLower = newLowerChat.replaceAll("add ", "").split(/\n/gm)
       let finalData = Object.fromEntries(newLower.map(x => x.split(" ")))
       for (let i = 0; i < Object.keys(finalData).length; i++) {
         if (!Object.values(finalData)[i]) {
@@ -331,10 +364,27 @@ client.on('message', async (msg) => {
         }
       }
       if (finalData != {}) {
+        let moreNewLower = newLower.map(x => x.split(" "))
+        for (let desc of moreNewLower) {
+          desc.splice(0, 2)
+        }
+        // Desc is daDesc
+        let daDesc = moreNewLower.map(x => x.join(" "))
+        let actVal = Object.values(finalData)
+        let actKey = Object.keys(finalData)
+        for (let i = 0; i < actKey.length; i++) {
+          let actObj = {}
+          actObj.Date = masterTime
+          actObj.Label = actKey[i]
+          actObj.Value = actVal[i]
+          actObj.Desc = daDesc[i]
+          desc.push(actObj)
+        }
+        fs.writeFileSync("database/" + msg.from + "/action.json", JSON.stringify(desc))
         inp(masterTime, finalData)
       }
       msg.reply("Input succeeded!")
-    } else if (/remove [^\s]+\n?/.test(lowerChat)) {
+    } else if (/^remove [^\s]+\n?$/.test(lowerChat)) {
       let newGood = lowerChat.replaceAll("remove ", "").split(/\n/gm)
       for (let i = 0; i < newGood.length; i++) {
         if (removeInp(newGood[i], masterTime)) {
@@ -345,16 +395,19 @@ client.on('message', async (msg) => {
       }
     }
   } catch (err) {
-    console.log("[ERROR] " + err)
+    dumpError(err)
   }
 
   try {
     if (msg.body.startsWith("!")) {
-      console.log(prefix + isCmd + " from " + msg.author.replace("@c.us", ""))
-      if (msg.author == undefined) {
-        msg.reply("This bot can only be used in a group!")
-        return
-      }
+      (async function() {
+        let onGroup = ""
+        if (msg.author != undefined) {
+          let chat = await client.getChatById(msg.from)
+          onGroup = " on " + chat.name
+        }
+        console.log(prefix + isCmd + " from " + msg.author.replace("@c.us", "") + onGroup)
+      })()
       switch(lowerChat) {
         case prefix + 'ping':
           msg.reply("Pong!")
@@ -389,7 +442,7 @@ client.on('message', async (msg) => {
         case prefix + "download":
           if (fs.existsSync("database/" + msg.from + "/master.xlsx")) {
             msg.reply("Please wait!")
-            uploadExcel(msg.from, msg.id)
+            uploadExcel(msg.from, false)
           } else {
             msg.reply("You haven't created an Excel yet!")
           }
@@ -398,7 +451,7 @@ client.on('message', async (msg) => {
         case prefix + "reset":
           if (fs.existsSync("database/" + msg.from + "/master.xlsx")) {
             msg.reply("Resetting Excel!")
-            resetExcel(msg.from, msg.id)
+            resetExcel(msg.from, false)
           } else {
             msg.reply("You haven't created an Excel yet!")
           }
@@ -409,7 +462,7 @@ client.on('message', async (msg) => {
       }
     }
   } catch (err) {
-    console.log('[ERROR] ' + err)
+    dumpError(err)
     msg.reply("[ERROR] " + err)
   }
 });
@@ -473,6 +526,8 @@ app.post('/send-message', [
       message: errors.mapped()
     });
   }
+
+  console.log(JSON.stringify(req.body))
 
   const number = phoneNumberFormatter(req.body.number);
   const message = req.body.message;
