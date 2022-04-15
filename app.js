@@ -207,7 +207,16 @@ client.on('message', async (msg) => {
         for (let j = 0; j < userMaster.length; j++) {
           if (dataKey[i] == userMaster[j].List) {
             // If exist a label, try to write on it
-            userMaster[j][daDate] = dataVal[i]
+            // But if there's a -/+ sign, try to add it up
+            if (/\+|\-/.test(dataVal[i])) {
+              let parsedMaster = parseInt(userMaster[j][daDate])
+              let parsedDataVal = parseInt(dataVal[i])
+              let res = parsedMaster + parsedDataVal
+              let resString = res.toString()
+              userMaster[j][daDate] = resString
+            } else {
+              userMaster[j][daDate] = dataVal[i]
+            }
             break
           } else if (j == userMaster.length - 1) {
             // If the label don't exist, create it
@@ -305,11 +314,16 @@ client.on('message', async (msg) => {
   }
   function removeInp(arg, daTime) {
     let deMaster = JSON.parse(fs.readFileSync("database/" + msg.from + "/master.json"))
-    if (!daTime) {
-      daTime = masterTime
-    }
+    let deDesc = JSON.parse(fs.readFileSync("database/" + msg.from + "/action.json"))
     for (let i = 0; i < deMaster.length; i++) {
       if (deMaster[i].List == arg && deMaster[i][daTime]) {
+        let remDesc = {}
+        remDesc.Date = daTime
+        remDesc.Label = arg
+        remDesc.Value = "-" + deMaster[i][daTime]
+        remDesc.Desc = "remove"
+        deDesc.push(remDesc)
+        fs.writeFileSync("database/" + msg.from + "/action.json", JSON.stringify(deDesc))
         deMaster[i][daTime] = ""
         fs.writeFileSync("database/" + msg.from + "/master.json", JSON.stringify(deMaster))
         checkEmp()
@@ -353,9 +367,9 @@ client.on('message', async (msg) => {
   }
   try {
     let desc = JSON.parse(fs.readFileSync("database/" + msg.from + "/action.json"))
-    if (/^add [^\s]+ \d+ ?[^\n]+?\n?$/gm.test(lowerChat)) {
+    if (/^add [^\s]+ (\-|\+)?\d+( [^\n]+)?\n?$/gm.test(lowerChat)) {
       // args[2] must exist, args[2] must be a number
-      newLowerChat = lowerChat.match(/^add [^\s]+ \d+ ?[^\n]+?\n?$/gm).join("\n")
+      newLowerChat = lowerChat.match(/^add [^\s]+ (\-|\+)?\d+( [^\n]+)?\n?$/gm).join("\n")
       let newLower = newLowerChat.replaceAll("add ", "").split(/\n/gm)
       let finalData = Object.fromEntries(newLower.map(x => x.split(" ")))
       for (let i = 0; i < Object.keys(finalData).length; i++) {
