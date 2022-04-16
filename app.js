@@ -78,6 +78,7 @@ client.on('group_join', async (res) => {
 function init(thor) {
   if (!fs.existsSync("database/" + thor + "/log")){
     fs.mkdirSync("database/" + thor + "/log", {recursive:true})
+    fs.mkdirSync("database/" + thor + "/old")
   }
   fs.writeFileSync("database/" + thor + "/master.json", "[]")
   fs.writeFileSync("database/" + thor + "/date.json", "[]")
@@ -119,17 +120,24 @@ async function resetExcel(msgFrom, isCron) {
   if (fs.existsSync("database/" + msgFrom + "/master.xlsx")){
     if (isCron) {
       await uploadExcel(msgFrom, true)
+      let dateNow = JSON.parse(fs.readFileSync("database/" + msgFrom + "/date.json"))
+      let sumNow = JSON.parse(fs.readFileSync("database/" + msgFrom + "/master.json"))
+      let actNow = JSON.parse(fs.readFileSync("database/" + msgFrom + "/action.json"))
+      let resetTimeLog = moment().tz("Israel").format("M_YY")
+      fs.writeFileSync("database/" + msgFrom + "/old/Sum_" + resetTimeLog + ".json", JSON.stringify(sumNow))
+      fs.writeFileSync("database/" + msgFrom + "/old/Date_" + resetTimeLog + ".json", JSON.stringify(dateNow))
+      fs.writeFileSync("database/" + msgFrom + "/old/" + resetTimeLog + ".json", JSON.stringify(actNow))
       fs.unlinkSync("database/" + msgFrom + "/master.xlsx")
     } else {
       await uploadExcel(msgFrom, false)
       fs.unlinkSync("database/" + msgFrom + "/master.xlsx")
     }
+    client.sendMessage(msgFrom, "Your Excel has been reset!")
   }
   fs.unlinkSync("database/" + msgFrom + "/master.json")
   fs.unlinkSync("database/" + msgFrom + "/date.json")
   fs.unlinkSync("database/" + msgFrom + "/action.json")
   init(msgFrom)
-  client.sendMessage(msgFrom, "Your Excel has been reset!")
 }
 schedule.scheduleJob({rule: "0 0 1 * *", tz:"Israel"}, () => {
   cronReset()
@@ -209,7 +217,7 @@ client.on('message', async (msg) => {
             // If exist a label, try to write on it
             // But if there's a -/+ sign, try to add it up
             if (/\+|\-/.test(dataVal[i])) {
-              let parsedMaster = parseInt(userMaster[j][daDate])
+              let parsedMaster = parseInt(userMaster[j][daDate]) || 0
               let parsedDataVal = parseInt(dataVal[i])
               let res = parsedMaster + parsedDataVal
               let resString = res.toString()
@@ -245,7 +253,7 @@ client.on('message', async (msg) => {
   function createSummary() {
     let daMaster = JSON.parse(fs.readFileSync("database/" + msg.from + "/master.json"))
     let datetoMaster = JSON.parse(fs.readFileSync("database/" + msg.from + "/date.json"))
-      fs.writeFileSync("database/" + msg.from + "/log/" + moment().tz("Israel").format("Do MMM YYYY kk mm ss") + ".json", JSON.stringify(daMaster))
+    fs.writeFileSync("database/" + msg.from + "/log/" + moment().tz("Israel").format("Do MMM YYYY kk mm ss") + ".json", JSON.stringify(daMaster))
     let sumFunc = {}
     sumFunc.List = "summary"
     let sumArr = []
@@ -260,9 +268,64 @@ client.on('message', async (msg) => {
     daMaster.push(sumFunc)
     setExcel(daMaster)
   }
-  function setExcel(daJason) {
+  function oldSum(daMaster, datetoMaster) {
+    let sumFunc = {}
+    sumFunc.List = "summary"
+    let sumArr = []
+    for (let i = 0; i < datetoMaster.length; i++) {
+      let sumArrTemp = []
+      for (let j = 0; j < daMaster.length; j++) {
+        sumArrTemp.push(parseInt(daMaster[j][datetoMaster[i]]) || 0)
+      }
+      sumArr.push(sumArrTemp.reduce((partialSum, a) => partialSum + a, 0))
+      sumFunc[datetoMaster[i]] = sumArr[i].toString()
+    }
+    daMaster.push(sumFunc)
+    return daMaster
+  }
+  function oldSetExcel(daJason, realDate) {
+    let red = "F4B084"
+    let green = "A9D08E"
+    let iniWs = XLSX.utils.json_to_sheet(daJason)
+    for (let i = 0; i < daJason.length; i++) {
+      for (let j = 1; j < Object.keys(daJason[i]).length-1; j++) {
+        let parseJ = parseInt(daJason[i][realDate[j]]) || 0
+        let parseJ1 = parseInt(daJason[i][realDate[j-1]]) || 0
+        if (parseJ < parseJ1) {
+          // Output green
+          let col = String.fromCharCode(j+66)
+          let row = i+2
+          let colUndRow = col+row
+          iniWs[colUndRow].s = {
+            fill: {
+              fgColor: {
+                rgb: green
+              }
+            }
+          }
+        } else if (parseJ > parseJ1) {
+          // Output red
+          let col = String.fromCharCode(j+66)
+          let row = i+2
+          let colUndRow = col+row
+          iniWs[colUndRow].s = {
+            fill: {
+              fgColor: {
+                rgb: red
+              }
+            }
+          }
+        }
+      }
+    }
+    return iniWs
+  }
+  async function setExcel(daJason) {
     // All setup for the excel (coloring) is here
     let realDate = JSON.parse(fs.readFileSync("database/" + msg.from + "/date.json"))
+    let daAct = JSON.parse(fs.readFileSync("database/" + msg.from + "/action.json"))
+    let oldDir = await fs.readdirSync("database/" + msg.from + "/old")
+    let actTime = moment().tz("Israel").format("M_YY")
     let red = "F4B084"
     let green = "A9D08E"
     // let yellow = "FFFF00"
@@ -303,13 +366,43 @@ client.on('message', async (msg) => {
       }
     }
     XLSX.utils.book_append_sheet(iniWb, iniWs, "Summary")
-    // Add another sheet if date named json exist (M_YY)
-    // Add Summary_M_YY
-    // Setup action.json 
+    // Setup action.json
+    let iniWsAction = XLSX.utils.json_to_sheet(daAct)
+    XLSX.utils.book_append_sheet(iniWb, iniWsAction, actTime)
+    if (oldDir.length != 0) {
+      // Add another sheet if date named json exist old/(M_YY)
+      // Add Sum_M_YY
+      let sumXlsx = []
+      oldDir.map(x => {
+        if(/Sum/.test(x)) {
+          sumXlsx.push(moment(x.replace("Sum_", "").replace(".json", ""), "M_YY"))
+        }
+      })
+      // Just use one, either sumXlsx or normXlsx because both have the same value
+      // Old folder contains Date_date.json, Sum_date.json, and date.json
+      let sumSort = []
+      sumXlsx
+        .sort((a, b) => a.diff(b))
+        .reverse()
+        .map(x => {
+          let disDate = new Date(x)
+          sumSort.push(moment(disDate).format("M_YY"))
+        })
+      // Append one by one into the Excel
+      for (let sumDate of sumSort) {
+        let oldDate = JSON.parse(fs.readFileSync("database/" + msg.from + "/old/Date_" + sumDate + ".json"))
+        let sumTemp = JSON.parse(fs.readFileSync("database/" + msg.from + "/old/Sum_" + sumDate + ".json"))
+        let curAct = JSON.parse(fs.readFileSync("database/" + msg.from + "/old/" + sumDate + ".json"))
+        let daOldSum = oldSum(sumTemp, oldDate)
+        let resSum = oldSetExcel(daOldSum, oldDate)
+        let resAct = XLSX.utils.json_to_sheet(curAct)
+        // "Sum_" + sumDate
+        XLSX.utils.book_append_sheet(iniWb, resSum, "Sum_" + sumDate)
+        XLSX.utils.book_append_sheet(iniWb, resAct, sumDate)
+      }
+    }
     XLSX.writeFile(iniWb, "database/" + msg.from + "/master.xlsx")
     XLSX.writeFile(iniWb, "database/" + msg.from + "/log/" + moment().tz("Israel").format("Do MMM YYYY kk mm ss") + ".xlsx")
-
-    //msg.reply("Input succeeded!")
     //uploadExcel()
   }
   function removeInp(arg, daTime) {
@@ -434,7 +527,34 @@ client.on('message', async (msg) => {
         break
 
         case prefix + "debug":
-          cronReset()
+          let mwe = await fs.readdirSync("database/" + msg.from + "/old")
+          console.log(mwe)
+          let sumXlsx = []
+          let normXlsx = []
+          mwe.map(x => {
+            if(/Sum/.test(x)) {
+              sumXlsx.push(moment(x.replace("Sum_", "").replace(".json", ""), "M_YY"))
+            } else {
+              normXlsx.push(moment(x.replace(".json", ""), "M_YY"))
+            }
+          })
+          let sumSort = []
+          let normSort = []
+          sumXlsx
+            .sort((a, b) => a.diff(b))
+            .reverse()
+            .map(x => {
+              let disDate = new Date(x)
+              sumSort.push(moment(disDate).format("M_YY"))
+            })
+          normXlsx
+            .sort((a, b) => a.diff(b))
+            .reverse()
+            .map(x => {
+              let disDate = new Date(x)
+              normSort.push(moment(disDate).format("M_YY"))
+            })
+          console.log("Sum sort is:\n" + sumSort + "\nNormal sort is:\n" + normSort)
         break
 
         case prefix + "logout":
@@ -449,8 +569,13 @@ client.on('message', async (msg) => {
           const jsonTest = JSON.parse(fs.readFileSync("database/" + msg.from + "/master.json"))
           const iniWb = XLSX.utils.book_new()
           var iniWs = XLSX.utils.json_to_sheet(jsonTest)
-          XLSX.utils.book_append_sheet(iniWb, iniWs, "Sheesh")
+          XLSX.utils.book_append_sheet(iniWb, iniWs, "Sheesh1")
+          XLSX.utils.book_append_sheet(iniWb, iniWs, "Sheesh2")
           XLSX.writeFile(iniWb, "Hmm.xlsx")
+        break
+
+        case prefix + "datest":
+          cronReset()
         break
 
         case prefix + "download":
