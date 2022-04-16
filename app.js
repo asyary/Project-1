@@ -526,56 +526,12 @@ client.on('message', async (msg) => {
           client.sendMessage(msg.from, menu[1])
         break
 
-        case prefix + "debug":
-          let mwe = await fs.readdirSync("database/" + msg.from + "/old")
-          console.log(mwe)
-          let sumXlsx = []
-          let normXlsx = []
-          mwe.map(x => {
-            if(/Sum/.test(x)) {
-              sumXlsx.push(moment(x.replace("Sum_", "").replace(".json", ""), "M_YY"))
-            } else {
-              normXlsx.push(moment(x.replace(".json", ""), "M_YY"))
-            }
-          })
-          let sumSort = []
-          let normSort = []
-          sumXlsx
-            .sort((a, b) => a.diff(b))
-            .reverse()
-            .map(x => {
-              let disDate = new Date(x)
-              sumSort.push(moment(disDate).format("M_YY"))
-            })
-          normXlsx
-            .sort((a, b) => a.diff(b))
-            .reverse()
-            .map(x => {
-              let disDate = new Date(x)
-              normSort.push(moment(disDate).format("M_YY"))
-            })
-          console.log("Sum sort is:\n" + sumSort + "\nNormal sort is:\n" + normSort)
-        break
-
         case prefix + "logout":
           (async function() {
             msg.reply("Logout engaged. Good night.")
             await sleep(2000)
             client.logout()
           })()
-        break
-
-        case prefix + "ngetest":
-          const jsonTest = JSON.parse(fs.readFileSync("database/" + msg.from + "/master.json"))
-          const iniWb = XLSX.utils.book_new()
-          var iniWs = XLSX.utils.json_to_sheet(jsonTest)
-          XLSX.utils.book_append_sheet(iniWb, iniWs, "Sheesh1")
-          XLSX.utils.book_append_sheet(iniWb, iniWs, "Sheesh2")
-          XLSX.writeFile(iniWb, "Hmm.xlsx")
-        break
-
-        case prefix + "datest":
-          cronReset()
         break
 
         case prefix + "download":
