@@ -192,6 +192,27 @@ client.on('message', async (msg) => {
     return
   }
 
+  // Reset func
+  if (fs.existsSync("database/" + msg.from + "/.reset")) {
+    if (lowerChat == "yes") {
+      msg.reply("Resetting Excel!")
+      resetExcel(msg.from, false)
+    } else if (lowerChat == "no") {
+      msg.reply("Canceling reset!")
+    } else {
+      msg.reply("Invalid input! Canceling reset!")
+    }
+    fs.unlinkSync("database/" + msg.from + "/.reset")
+  }
+  async function initReset() {
+    await fs.writeFileSync("database/" + msg.from + "/.reset", "")
+    await sleep(60000)
+    if (fs.existsSync("database/" + msg.from + "/.reset")) {
+      msg.reply("Canceling reset!")
+      fs.unlinkSync("database/" + msg.from + "/.reset")
+    }
+  }
+
   // Kumpulan function
   function inp(daDate, data) {
     // All processing input is here
@@ -207,7 +228,7 @@ client.on('message', async (msg) => {
       for (let i = 0; i < dataKey.length; i++) {
         let tempData = {}
         tempData.List = dataKey[i]
-        tempData[daDate] = dataVal[i]
+        tempData[daDate] = dataVal[i].replace(/\+|-/g, "")
         userMaster.push(tempData)
       }
     } else {
@@ -233,7 +254,7 @@ client.on('message', async (msg) => {
             for (let k = 0; k < dateMaster.length; k++) {
               tempData[dateMaster[k]] = ""
             }
-            tempData[daDate] = dataVal[i]
+            tempData[daDate] = dataVal[i].replace(/\+|-/g, "")
             userMaster.push(tempData)
           }
         }
@@ -459,38 +480,63 @@ client.on('message', async (msg) => {
     init(msg.from)
   }
   try {
+    let leMaster = JSON.parse(fs.readFileSync("database/" + msg.from + "/master.json"))
     let desc = JSON.parse(fs.readFileSync("database/" + msg.from + "/action.json"))
-    if (/^add [^\s]+ (\-|\+)?\d+( [^\n]+)?\n?$/gm.test(lowerChat)) {
-      // args[2] must exist, args[2] must be a number
-      newLowerChat = lowerChat.match(/^add [^\s]+ (\-|\+)?\d+( [^\n]+)?\n?$/gm).join("\n")
+    if (/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat)) {
+      newLowerChat = lowerChat.match(/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ')
       let newLower = newLowerChat.replaceAll("add ", "").split(/\n/gm)
       let finalData = Object.fromEntries(newLower.map(x => x.split(" ")))
-      for (let i = 0; i < Object.keys(finalData).length; i++) {
-        if (!Object.values(finalData)[i]) {
-          delete finalData[Object.keys(finalData)[i]]
+      // If there's a +/- sign and there's no value, stop
+      var isContinue = false
+      let finalKey = Object.keys(finalData)
+      let finalVal = Object.values(finalData)
+      if (leMaster == "") {
+        // Special case
+        isContinue = true
+      }
+      for (let i = 0; i < finalVal.length; i++) {
+        if (/\+|\-/.test(finalVal[i])) {
+          // Check if exist a value before this
+          for (let j = 0; j < leMaster.length; j++) {
+            if (finalKey[i] == leMaster[j].List) {
+              if (!leMaster[j][masterTime] || leMaster[j][masterTime] == 0) {
+                msg.reply("Error! No value on *" + finalKey[i] + "*, " + masterTime + "\nPlease initialize a value before using +/- sign!")
+                break
+              } else {
+                isContinue = true
+                break
+              }
+            } else if (j == leMaster.length-1) {
+              msg.reply("Error! No value on *" + finalKey[i] + "*, " + masterTime + "\nPlease initialize a value before using +/- sign!")
+            }
+          }
+        } else {
+          isContinue = true
         }
       }
-      if (finalData != {}) {
-        let moreNewLower = newLower.map(x => x.split(" "))
-        for (let desc of moreNewLower) {
-          desc.splice(0, 2)
+      if (isContinue) {
+        if (finalData != {}) {
+          let moreNewLower = newLower.map(x => x.split(" "))
+          for (let desc of moreNewLower) {
+            desc.splice(0, 2)
+          }
+          // Desc is daDesc
+          let daDesc = moreNewLower.map(x => x.join(" "))
+          let actVal = Object.values(finalData)
+          let actKey = Object.keys(finalData)
+          for (let i = 0; i < actKey.length; i++) {
+            let actObj = {}
+            actObj.Date = masterTime
+            actObj.Label = actKey[i]
+            actObj.Value = actVal[i]
+            actObj.Desc = daDesc[i]
+            desc.push(actObj)
+          }
+          fs.writeFileSync("database/" + msg.from + "/action.json", JSON.stringify(desc))
+          inp(masterTime, finalData)
         }
-        // Desc is daDesc
-        let daDesc = moreNewLower.map(x => x.join(" "))
-        let actVal = Object.values(finalData)
-        let actKey = Object.keys(finalData)
-        for (let i = 0; i < actKey.length; i++) {
-          let actObj = {}
-          actObj.Date = masterTime
-          actObj.Label = actKey[i]
-          actObj.Value = actVal[i]
-          actObj.Desc = daDesc[i]
-          desc.push(actObj)
-        }
-        fs.writeFileSync("database/" + msg.from + "/action.json", JSON.stringify(desc))
-        inp(masterTime, finalData)
+        msg.reply("Input succeeded!")
       }
-      msg.reply("Input succeeded!")
     } else if (/^remove [^\s]+\n?$/.test(lowerChat)) {
       let newGood = lowerChat.replaceAll("remove ", "").split(/\n/gm)
       for (let i = 0; i < newGood.length; i++) {
@@ -545,8 +591,8 @@ client.on('message', async (msg) => {
 
         case prefix + "reset":
           if (fs.existsSync("database/" + msg.from + "/master.xlsx")) {
-            msg.reply("Resetting Excel!")
-            resetExcel(msg.from, false)
+            msg.reply("Are you sure you want to reset your Excel?\nYes/No")
+            initReset()
           } else {
             msg.reply("You haven't created an Excel yet!")
           }
