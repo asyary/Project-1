@@ -187,7 +187,7 @@ client.on('message', async (msg) => {
   const chat = await client.getChatById(msg.from)
 
   // Just force exit if is not a group
-  if (msg.author == undefined) {
+  if (msg.author == undefined && !fs.existsSync("database/" + msgFrom + "/master.json")) {
     msg.reply("This bot can only be used in a group!")
     return
   }
