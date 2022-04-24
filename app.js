@@ -482,9 +482,14 @@ client.on('message', async (msg) => {
   try {
     let leMaster = JSON.parse(fs.readFileSync("database/" + msg.from + "/master.json"))
     let desc = JSON.parse(fs.readFileSync("database/" + msg.from + "/action.json"))
-    if (/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat)) {
-      newLowerChat = lowerChat.match(/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ')
-      let newLower = newLowerChat.replaceAll("add ", "").split(/\n/gm)
+    if (/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat) || /^להוסיף +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat)) {
+      if (lowerChat.includes("add")) {
+        newLowerChat = lowerChat.match(/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ')
+        newLower = newLowerChat.replaceAll("add ", "").split(/\n/gm)
+      } else if (lowerChat.includes("להוסיף")) {
+        newLowerChat = lowerChat.match(/^להוסיף +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ')
+        newLower = newLowerChat.replaceAll("להוסיף ", "").split(/\n/gm)
+      }
       let finalData = Object.fromEntries(newLower.map(x => x.split(" ")))
       // If there's a +/- sign and there's no value, stop
       var isContinue = false
@@ -537,8 +542,8 @@ client.on('message', async (msg) => {
         }
         msg.reply("Input succeeded!")
       }
-    } else if (/^remove [^\s]+\n?$/.test(lowerChat)) {
-      let newGood = lowerChat.replaceAll("remove ", "").split(/\n/gm)
+    } else if (/^remove [^\s]+\n?$/.test(lowerChat) || /^למחוק [^\s]+\n?$/.test(lowerChat)) {
+      let newGood = lowerChat.replaceAll("remove ", "").replaceAll("למחוק ", "").split(/\n/gm)
       for (let i = 0; i < newGood.length; i++) {
         if (removeInp(newGood[i], masterTime)) {
           msg.reply("Value from label *" + newGood[i] + "* has been removed!")
@@ -552,7 +557,7 @@ client.on('message', async (msg) => {
   }
 
   try {
-    if (msg.body.startsWith("!")) {
+    if ((msg.body.startsWith("!") || msg.body.endsWith("!")) && args.length == 1) {
       (async function() {
         let onGroup = ""
         if (msg.author != undefined) {
@@ -562,12 +567,17 @@ client.on('message', async (msg) => {
         console.log(prefix + isCmd + " from " + msg.author.replace("@c.us", "") + onGroup)
       })()
       switch(lowerChat) {
+        case "ping" + prefix:
         case prefix + 'ping':
           msg.reply("Pong!")
         break
 
         case prefix + "help":
         case prefix + "menu":
+        case prefix + "עזרה":
+        case prefix + "תפריט":
+        case "עזרה" + prefix:
+        case "תפריט" + prefix:
           msg.reply(menu[0])
           client.sendMessage(msg.from, menu[1])
         break
@@ -581,6 +591,9 @@ client.on('message', async (msg) => {
         break
 
         case prefix + "download":
+        case "download" + prefix:
+        case prefix + "הורד":
+        case "הורד" + prefix:
           if (fs.existsSync("database/" + msg.from + "/master.xlsx")) {
             msg.reply("Please wait!")
             uploadExcel(msg.from, false)
@@ -590,6 +603,9 @@ client.on('message', async (msg) => {
         break
 
         case prefix + "reset":
+        case "reset" + prefix:
+        case prefix + "אתחול":
+        case "אתחול" + prefix:
           if (fs.existsSync("database/" + msg.from + "/master.xlsx")) {
             msg.reply("Are you sure you want to reset your Excel?\nYes/No")
             initReset()
