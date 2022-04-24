@@ -73,7 +73,6 @@ const client = new Client({
 client.on('group_join', async (res) => {
   res.reply("Hi! I'm AsyaryGig's bot!\nUse !help or !menu to get started!")
   init(res.chatId)
-  fs.writeFileSync("database/" + res.chatId + "/.new", "")
 })
 
 function init(thor) {
@@ -189,12 +188,7 @@ client.on('message', async (msg) => {
 
   // Just force exit if is not a group
   if (msg.author == undefined) {
-    if (!fs.existsSync("database/" + msg.from + "/.new")) {
-      msg.reply("This bot can only be used in a group!")
-      return
-    } else {
-      fs.unlinkSync("database/" + msg.from + "/.new")
-    }
+    return
   }
 
   // Reset func
