@@ -270,7 +270,7 @@ client.on('message', async (msg) => {
     let datetoMaster = JSON.parse(fs.readFileSync("database/" + msg.from + "/date.json"))
     fs.writeFileSync("database/" + msg.from + "/log/" + moment().tz("Israel").format("Do MMM YYYY kk mm ss") + ".json", JSON.stringify(daMaster))
     let sumFunc = {}
-    sumFunc.List = "summary"
+    sumFunc.List = "סיכום"
     let sumArr = []
     for (let i = 0; i < datetoMaster.length; i++) {
       let sumArrTemp = []
@@ -285,7 +285,7 @@ client.on('message', async (msg) => {
   }
   function oldSum(daMaster, datetoMaster) {
     let sumFunc = {}
-    sumFunc.List = "summary"
+    sumFunc.List = "סיכום"
     let sumArr = []
     for (let i = 0; i < datetoMaster.length; i++) {
       let sumArrTemp = []
