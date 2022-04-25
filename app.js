@@ -473,6 +473,9 @@ client.on('message', async (msg) => {
   if (!fs.existsSync("database/" + msg.from + "/master.json") && msg.author != undefined) {
     init(msg.from)
   }
+  function toLTR(str) {
+    return str.split(" ").reverse().join(" ")
+  }
   try {
     let leMaster = JSON.parse(fs.readFileSync("database/" + msg.from + "/master.json"))
     let desc = JSON.parse(fs.readFileSync("database/" + msg.from + "/action.json"))
@@ -481,8 +484,13 @@ client.on('message', async (msg) => {
         newLowerChat = lowerChat.match(/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ')
         newLower = newLowerChat.replaceAll("add ", "").split(/\n/gm)
       } else if (lowerChat.includes("להוסיף")) {
-        newLowerChat = lowerChat.match(/^להוסיף +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ')
-        newLower = newLowerChat.replaceAll("להוסיף ", "").split(/\n/gm)
+        let bruh = []
+        newLowerChat = lowerChat.match(/^להוסיף +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ').split("\n")
+        for (let things of newLowerChat) {
+          bruh.push(toLTR(things))
+        }
+        let newBruh = bruh.join("\n")
+        newLower = newBruh.replaceAll(" להוסיף", "").split(/\n/gm).map(x => x = x.split(" ").reverse().join(" "))
       }
       let finalData = Object.fromEntries(newLower.map(x => x.split(" ")))
       // If there's a +/- sign and there's no value, stop
