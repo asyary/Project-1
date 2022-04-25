@@ -71,7 +71,7 @@ const client = new Client({
 });
 
 client.on('group_join', async (res) => {
-  res.reply("Hi! I'm AsyaryGig's bot!\nUse !help or !menu to get started!")
+  res.reply("היי! אני הבוט של AsyaryGig!\nהשתמש ב- !עזרה או !תפריט כדי להתחיל!")
   init(res.chatId)
 })
 
@@ -86,7 +86,7 @@ function init(thor) {
 }
 async function uploadExcel(msgFrom, isCron) {
   if (!fs.existsSync("database/" + msgFrom + "/master.xlsx") && !isCron) {
-    client.sendMessage(msgFrom, "You don't have an Excel yet!")
+    client.sendMessage(msgFrom, "עדיין אין לך Excel")
     return
   } else if (!fs.existsSync("database/" + msgFrom + "/master.xlsx") && isCron) {
     return
@@ -132,7 +132,7 @@ async function resetExcel(msgFrom, isCron) {
       await uploadExcel(msgFrom, false)
       fs.unlinkSync("database/" + msgFrom + "/master.xlsx")
     }
-    client.sendMessage(msgFrom, "Your Excel has been reset!")
+    client.sendMessage(msgFrom, "קובץ Excel שלך אותחל")
   }
   fs.unlinkSync("database/" + msgFrom + "/master.json")
   fs.unlinkSync("database/" + msgFrom + "/date.json")
@@ -186,20 +186,15 @@ client.on('message', async (msg) => {
   const menu = JSON.parse(fs.readFileSync("menu.json"))
   const chat = await client.getChatById(msg.from)
 
-  // Just force exit if is not a group
-  if (msg.author == undefined) {
-    return
-  }
-
   // Reset func
   if (fs.existsSync("database/" + msg.from + "/.reset")) {
-    if (lowerChat == "yes") {
-      msg.reply("Resetting Excel!")
+    if (lowerChat == "yes" || lowerChat == "כן") {
+      msg.reply("מאתחל קובץ Excel")
       resetExcel(msg.from, false)
-    } else if (lowerChat == "no") {
-      msg.reply("Canceling reset!")
+    } else if (lowerChat == "no" || lowerChat == "לא") {
+      msg.reply("מבטל אתחול")
     } else {
-      msg.reply("Invalid input! Canceling reset!")
+      msg.reply("בחירה לא תקינה ! אתחול מבוטל")
     }
     fs.unlinkSync("database/" + msg.from + "/.reset")
   }
@@ -207,7 +202,7 @@ client.on('message', async (msg) => {
     await fs.writeFileSync("database/" + msg.from + "/.reset", "")
     await sleep(60000)
     if (fs.existsSync("database/" + msg.from + "/.reset")) {
-      msg.reply("Canceling reset!")
+      msg.reply("מבטל אתחול")
       fs.unlinkSync("database/" + msg.from + "/.reset")
     }
   }
@@ -434,7 +429,7 @@ client.on('message', async (msg) => {
         remDesc.Date = daTime
         remDesc.Label = arg
         remDesc.Value = "-" + deMaster[i][daTime]
-        remDesc.Desc = "remove"
+        remDesc.Desc = "למחוק"
         deDesc.push(remDesc)
         fs.writeFileSync("database/" + msg.from + "/action.json", JSON.stringify(deDesc))
         deMaster[i][daTime] = ""
@@ -504,14 +499,14 @@ client.on('message', async (msg) => {
           for (let j = 0; j < leMaster.length; j++) {
             if (finalKey[i] == leMaster[j].List) {
               if (!leMaster[j][masterTime] || leMaster[j][masterTime] == 0) {
-                msg.reply("Error! No value on *" + finalKey[i] + "*, " + masterTime + "\nPlease initialize a value before using +/- sign!")
+                msg.reply("לתווית *" + finalKey[i] + "* אין ערך קודם.\nאנא אתחל תווית לפני שימוש בסימן  +\-")
                 break
               } else {
                 isContinue = true
                 break
               }
             } else if (j == leMaster.length-1) {
-              msg.reply("Error! No value on *" + finalKey[i] + "*, " + masterTime + "\nPlease initialize a value before using +/- sign!")
+              msg.reply("לתווית *" + finalKey[i] + "* אין ערך קודם.\nאנא אתחל תווית לפני שימוש בסימן  +\-")
             }
           }
         } else {
@@ -539,15 +534,15 @@ client.on('message', async (msg) => {
           fs.writeFileSync("database/" + msg.from + "/action.json", JSON.stringify(desc))
           inp(masterTime, finalData)
         }
-        msg.reply("Input succeeded!")
+        msg.reply("המידע הוכנס בהצלחה")
       }
     } else if (/^remove [^\s]+\n?$/.test(lowerChat) || /^למחוק [^\s]+\n?$/.test(lowerChat)) {
       let newGood = lowerChat.replaceAll("remove ", "").replaceAll("למחוק ", "").split(/\n/gm)
       for (let i = 0; i < newGood.length; i++) {
         if (removeInp(newGood[i], masterTime)) {
-          msg.reply("Value from label *" + newGood[i] + "* has been removed!")
+          msg.reply("הערך מתווית *" + newGood[i] + "* הופחת")
         } else {
-          msg.reply("Label *" + newGood[i] + "* from *" + masterTime + "* did not exist!")
+          msg.reply("התווית *" + newGood[i] + "* מ *" + masterTime + "* לא קיימת")
         }
       }
     }
@@ -565,56 +560,62 @@ client.on('message', async (msg) => {
         }
         console.log(prefix + isCmd + " from " + msg.author.replace("@c.us", "") + onGroup)
       })()
-      switch(lowerChat) {
-        case "ping" + prefix:
-        case prefix + 'ping':
-          msg.reply("Pong!")
-        break
+      if (msg.author != undefined) {
+        switch(lowerChat) {
+          case "ping" + prefix:
+          case prefix + 'ping':
+            msg.reply("Pong!")
+          break
 
-        case prefix + "help":
-        case prefix + "menu":
-        case prefix + "עזרה":
-        case prefix + "תפריט":
-        case "עזרה" + prefix:
-        case "תפריט" + prefix:
-          msg.reply(menu[0])
-          client.sendMessage(msg.from, menu[1])
-        break
+          case prefix + "help":
+          case prefix + "menu":
+          case "help" + prefix:
+          case "menu" + prefix:
+          case prefix + "עזרה":
+          case prefix + "תפריט":
+          case "עזרה" + prefix:
+          case "תפריט" + prefix:
+            msg.reply(menu[0])
+            client.sendMessage(msg.from, menu[1])
+          break
 
-        case prefix + "logout":
-          (async function() {
-            msg.reply("Logout engaged. Good night.")
-            await sleep(2000)
-            client.logout()
-          })()
-        break
+          case prefix + "logout":
+            (async function() {
+              msg.reply("Logout engaged. Good night.")
+              await sleep(2000)
+              client.logout()
+            })()
+          break
 
-        case prefix + "download":
-        case "download" + prefix:
-        case prefix + "הורד":
-        case "הורד" + prefix:
-          if (fs.existsSync("database/" + msg.from + "/master.xlsx")) {
-            msg.reply("Please wait!")
-            uploadExcel(msg.from, false)
-          } else {
-            msg.reply("You haven't created an Excel yet!")
-          }
-        break
+          case prefix + "download":
+          case "download" + prefix:
+          case prefix + "הורד":
+          case "הורד" + prefix:
+            if (fs.existsSync("database/" + msg.from + "/master.xlsx")) {
+              msg.reply("בבקשה המתן")
+              uploadExcel(msg.from, false)
+            } else {
+              msg.reply("עדיין אין לך Excel")
+            }
+          break
 
-        case prefix + "reset":
-        case "reset" + prefix:
-        case prefix + "אתחול":
-        case "אתחול" + prefix:
-          if (fs.existsSync("database/" + msg.from + "/master.xlsx")) {
-            msg.reply("Are you sure you want to reset your Excel?\nYes/No")
-            initReset()
-          } else {
-            msg.reply("You haven't created an Excel yet!")
-          }
-        break
+          case prefix + "reset":
+          case "reset" + prefix:
+          case prefix + "אתחול":
+          case "אתחול" + prefix:
+            if (fs.existsSync("database/" + msg.from + "/master.xlsx")) {
+              msg.reply("אשר אתחול לקובץ(נתוני החודש הנוכחי ימחקו)\nכן/לא")
+              initReset()
+            } else {
+              msg.reply("עדיין אין לך Excel")
+            }
+          break
 
-        default:
-          msg.reply("The *" + lowerChat + "* command does not exist!")
+          default:
+            msg.reply("הפקודה *" + lowerChat + "* לא קיימת")
+        }
+      } else {
+        msg.reply("אתה יכול להשתמש בבוט זה רק בקבוצה")
       }
     }
   } catch (err) {
