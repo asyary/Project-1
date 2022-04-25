@@ -507,14 +507,14 @@ client.on('message', async (msg) => {
           for (let j = 0; j < leMaster.length; j++) {
             if (finalKey[i] == leMaster[j].List) {
               if (!leMaster[j][masterTime] || leMaster[j][masterTime] == 0) {
-                msg.reply("לתווית *" + finalKey[i] + "* אין ערך קודם.\nאנא אתחל תווית לפני שימוש בסימן  +\-")
+                msg.reply("לתווית *" + finalKey[i] + "* אין ערך קודם.\nאנא אתחל תווית לפני שימוש בסימן  +/-")
                 break
               } else {
                 isContinue = true
                 break
               }
             } else if (j == leMaster.length-1) {
-              msg.reply("לתווית *" + finalKey[i] + "* אין ערך קודם.\nאנא אתחל תווית לפני שימוש בסימן  +\-")
+              msg.reply("לתווית *" + finalKey[i] + "* אין ערך קודם.\nאנא אתחל תווית לפני שימוש בסימן  +/-")
             }
           }
         } else {
