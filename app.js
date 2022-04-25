@@ -480,18 +480,18 @@ client.on('message', async (msg) => {
     if (fs.existsSync("database/" + msg.from + "/master.json")) {
       let leMaster = JSON.parse(fs.readFileSync("database/" + msg.from + "/master.json"))
       let desc = JSON.parse(fs.readFileSync("database/" + msg.from + "/action.json"))
-      if (/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat) || /^להוסיף +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat)) {
+      if (/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat) || /^!?להוסיף +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat)) {
         if (lowerChat.includes("add")) {
           newLowerChat = lowerChat.match(/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ')
           newLower = newLowerChat.replaceAll("add ", "").split(/\n/gm)
         } else if (lowerChat.includes("להוסיף")) {
           let bruh = []
-          newLowerChat = lowerChat.match(/^להוסיף +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ').split("\n")
+          newLowerChat = lowerChat.match(/^!?להוסיף +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ').split("\n")
           for (let things of newLowerChat) {
             bruh.push(toLTR(things))
           }
           let newBruh = bruh.join("\n")
-          newLower = newBruh.replaceAll(" להוסיף", "").split(/\n/gm).map(x => x = x.split(" ").reverse().join(" "))
+          newLower = newBruh.replaceAll(/ !?להוסיף/gmi, "").split(/\n/gm).map(x => x = x.split(" ").reverse().join(" "))
         }
         let finalData = Object.fromEntries(newLower.map(x => x.split(" ")))
         // If there's a +/- sign and there's no value, stop
@@ -545,8 +545,8 @@ client.on('message', async (msg) => {
           }
           msg.reply("המידע הוכנס בהצלחה")
         }
-      } else if (/^remove [^\s]+\n?$/.test(lowerChat) || /^למחוק [^\s]+\n?$/.test(lowerChat)) {
-        let newGood = lowerChat.replaceAll("remove ", "").replaceAll("למחוק ", "").split(/\n/gm)
+      } else if (/^remove [^\s]+\n?$/.test(lowerChat) || /^!?למחוק [^\s]+\n?$/.test(lowerChat)) {
+        let newGood = lowerChat.replaceAll("remove ", "").replaceAll(/!?למחוק +/, "").split(/\n/gm)
         for (let i = 0; i < newGood.length; i++) {
           if (removeInp(newGood[i], masterTime)) {
             msg.reply("הערך מתווית *" + newGood[i] + "* הופחת")
