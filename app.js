@@ -477,80 +477,82 @@ client.on('message', async (msg) => {
     return str.split(" ").reverse().join(" ")
   }
   try {
-    let leMaster = JSON.parse(fs.readFileSync("database/" + msg.from + "/master.json"))
-    let desc = JSON.parse(fs.readFileSync("database/" + msg.from + "/action.json"))
-    if (/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat) || /^להוסיף +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat)) {
-      if (lowerChat.includes("add")) {
-        newLowerChat = lowerChat.match(/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ')
-        newLower = newLowerChat.replaceAll("add ", "").split(/\n/gm)
-      } else if (lowerChat.includes("להוסיף")) {
-        let bruh = []
-        newLowerChat = lowerChat.match(/^להוסיף +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ').split("\n")
-        for (let things of newLowerChat) {
-          bruh.push(toLTR(things))
-        }
-        let newBruh = bruh.join("\n")
-        newLower = newBruh.replaceAll(" להוסיף", "").split(/\n/gm).map(x => x = x.split(" ").reverse().join(" "))
-      }
-      let finalData = Object.fromEntries(newLower.map(x => x.split(" ")))
-      // If there's a +/- sign and there's no value, stop
-      var isContinue = false
-      let finalKey = Object.keys(finalData)
-      let finalVal = Object.values(finalData)
-      if (leMaster == "") {
-        // Special case
-        isContinue = true
-      }
-      for (let i = 0; i < finalVal.length; i++) {
-        if (/\+|\-/.test(finalVal[i])) {
-          // Check if exist a value before this
-          for (let j = 0; j < leMaster.length; j++) {
-            if (finalKey[i] == leMaster[j].List) {
-              if (!leMaster[j][masterTime] || leMaster[j][masterTime] == 0) {
-                msg.reply("לתווית *" + finalKey[i] + "* אין ערך קודם.\nאנא אתחל תווית לפני שימוש בסימן  +/-")
-                break
-              } else {
-                isContinue = true
-                break
-              }
-            } else if (j == leMaster.length-1) {
-              msg.reply("לתווית *" + finalKey[i] + "* אין ערך קודם.\nאנא אתחל תווית לפני שימוש בסימן  +/-")
-            }
+    if (fs.existsSync("database/" + msg.from + "/master.json")) {
+      let leMaster = JSON.parse(fs.readFileSync("database/" + msg.from + "/master.json"))
+      let desc = JSON.parse(fs.readFileSync("database/" + msg.from + "/action.json"))
+      if (/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat) || /^להוסיף +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat)) {
+        if (lowerChat.includes("add")) {
+          newLowerChat = lowerChat.match(/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ')
+          newLower = newLowerChat.replaceAll("add ", "").split(/\n/gm)
+        } else if (lowerChat.includes("להוסיף")) {
+          let bruh = []
+          newLowerChat = lowerChat.match(/^להוסיף +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ').split("\n")
+          for (let things of newLowerChat) {
+            bruh.push(toLTR(things))
           }
-        } else {
+          let newBruh = bruh.join("\n")
+          newLower = newBruh.replaceAll(" להוסיף", "").split(/\n/gm).map(x => x = x.split(" ").reverse().join(" "))
+        }
+        let finalData = Object.fromEntries(newLower.map(x => x.split(" ")))
+        // If there's a +/- sign and there's no value, stop
+        var isContinue = false
+        let finalKey = Object.keys(finalData)
+        let finalVal = Object.values(finalData)
+        if (leMaster == "") {
+          // Special case
           isContinue = true
         }
-      }
-      if (isContinue) {
-        if (finalData != {}) {
-          let moreNewLower = newLower.map(x => x.split(" "))
-          for (let desc of moreNewLower) {
-            desc.splice(0, 2)
+        for (let i = 0; i < finalVal.length; i++) {
+          if (/\+|\-/.test(finalVal[i])) {
+            // Check if exist a value before this
+            for (let j = 0; j < leMaster.length; j++) {
+              if (finalKey[i] == leMaster[j].List) {
+                if (!leMaster[j][masterTime] || leMaster[j][masterTime] == 0) {
+                  msg.reply("לתווית *" + finalKey[i] + "* אין ערך קודם.\nאנא אתחל תווית לפני שימוש בסימן  +/-")
+                  break
+                } else {
+                  isContinue = true
+                  break
+                }
+              } else if (j == leMaster.length-1) {
+                msg.reply("לתווית *" + finalKey[i] + "* אין ערך קודם.\nאנא אתחל תווית לפני שימוש בסימן  +/-")
+              }
+            }
+          } else {
+            isContinue = true
           }
-          // Desc is daDesc
-          let daDesc = moreNewLower.map(x => x.join(" "))
-          let actVal = Object.values(finalData)
-          let actKey = Object.keys(finalData)
-          for (let i = 0; i < actKey.length; i++) {
-            let actObj = {}
-            actObj.Date = masterTime
-            actObj.Label = actKey[i]
-            actObj.Value = actVal[i]
-            actObj.Desc = daDesc[i]
-            desc.push(actObj)
-          }
-          fs.writeFileSync("database/" + msg.from + "/action.json", JSON.stringify(desc))
-          inp(masterTime, finalData)
         }
-        msg.reply("המידע הוכנס בהצלחה")
-      }
-    } else if (/^remove [^\s]+\n?$/.test(lowerChat) || /^למחוק [^\s]+\n?$/.test(lowerChat)) {
-      let newGood = lowerChat.replaceAll("remove ", "").replaceAll("למחוק ", "").split(/\n/gm)
-      for (let i = 0; i < newGood.length; i++) {
-        if (removeInp(newGood[i], masterTime)) {
-          msg.reply("הערך מתווית *" + newGood[i] + "* הופחת")
-        } else {
-          msg.reply("התווית *" + newGood[i] + "* מ *" + masterTime + "* לא קיימת")
+        if (isContinue) {
+          if (finalData != {}) {
+            let moreNewLower = newLower.map(x => x.split(" "))
+            for (let desc of moreNewLower) {
+              desc.splice(0, 2)
+            }
+            // Desc is daDesc
+            let daDesc = moreNewLower.map(x => x.join(" "))
+            let actVal = Object.values(finalData)
+            let actKey = Object.keys(finalData)
+            for (let i = 0; i < actKey.length; i++) {
+              let actObj = {}
+              actObj.Date = masterTime
+              actObj.Label = actKey[i]
+              actObj.Value = actVal[i]
+              actObj.Desc = daDesc[i]
+              desc.push(actObj)
+            }
+            fs.writeFileSync("database/" + msg.from + "/action.json", JSON.stringify(desc))
+            inp(masterTime, finalData)
+          }
+          msg.reply("המידע הוכנס בהצלחה")
+        }
+      } else if (/^remove [^\s]+\n?$/.test(lowerChat) || /^למחוק [^\s]+\n?$/.test(lowerChat)) {
+        let newGood = lowerChat.replaceAll("remove ", "").replaceAll("למחוק ", "").split(/\n/gm)
+        for (let i = 0; i < newGood.length; i++) {
+          if (removeInp(newGood[i], masterTime)) {
+            msg.reply("הערך מתווית *" + newGood[i] + "* הופחת")
+          } else {
+            msg.reply("התווית *" + newGood[i] + "* מ *" + masterTime + "* לא קיימת")
+          }
         }
       }
     }
@@ -561,6 +563,7 @@ client.on('message', async (msg) => {
   try {
     if ((msg.body.startsWith("!") || msg.body.endsWith("!")) && args.length == 1) {
       (async function() {
+        if (msg.author == undefined) return
         let onGroup = ""
         if (msg.author != undefined) {
           let chat = await client.getChatById(msg.from)
