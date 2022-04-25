@@ -91,7 +91,7 @@ async function uploadExcel(msgFrom, isCron) {
   } else if (!fs.existsSync("database/" + msgFrom + "/master.xlsx") && isCron) {
     return
   }
-  if (JSON.parse(fs.readFileSync("database/" + msgFrom + "/master.json")) != "") {
+  if (JSON.parse(fs.readFileSync("database/" + msgFrom + "/master.json")) != "" || fs.existsSync("database/" + msgFrom + "/master.xlsx")) {
     let arrz = []
     let newArrz = []
     let chat = await client.getChatById(msgFrom)
@@ -546,7 +546,7 @@ client.on('message', async (msg) => {
           msg.reply("המידע הוכנס בהצלחה")
         }
       } else if (/^remove [^\s]+\n?$/.test(lowerChat) || /^!?למחוק [^\s]+\n?$/.test(lowerChat)) {
-        let newGood = lowerChat.replaceAll("remove ", "").replaceAll(/!?למחוק +/, "").split(/\n/gm)
+        let newGood = lowerChat.replaceAll("remove ", "").replaceAll(/!?למחוק +/gmi, "").split(/\n/gm)
         for (let i = 0; i < newGood.length; i++) {
           if (removeInp(newGood[i], masterTime)) {
             msg.reply("הערך מתווית *" + newGood[i] + "* הופחת")
