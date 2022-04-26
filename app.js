@@ -71,7 +71,10 @@ const client = new Client({
 });
 
 client.on('group_join', async (res) => {
-  res.reply("היי! אני הבוט של AsyaryGig!\nהשתמש ב- !עזרה או !תפריט כדי להתחיל!")
+  res.reply("היי! אני הבוט של הוצאות-משק-בית!")
+  const menu = JSON.parse(fs.readFileSync("menu.json"))
+  client.sendMessage(res.chatId, menu[0])
+  client.sendMessage(res.chatId, menu[1])
   init(res.chatId)
 })
 
@@ -549,7 +552,7 @@ client.on('message', async (msg) => {
         let newGood = lowerChat.replaceAll("remove ", "").replaceAll(/!?למחוק +/gmi, "").split(/\n/gm)
         for (let i = 0; i < newGood.length; i++) {
           if (removeInp(newGood[i], masterTime)) {
-            msg.reply("הערך מתווית *" + newGood[i] + "* הופחת")
+            msg.reply("תווית *" + newGood[i] + "* נמחקה")
           } else {
             msg.reply("התווית *" + newGood[i] + "* מ *" + masterTime + "* לא קיימת")
           }
