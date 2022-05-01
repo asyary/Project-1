@@ -522,7 +522,6 @@ client.on('message', async (msg) => {
               // If a value does not exist, simply strip the +/- sign
               // ^ By doing this, erases possiblity of weird *2 input
               if (finalKey[i] == leMaster[j].List) {
-                isContinue = true
                 break
               } else if (j == leMaster.length-1) {
                 finalData[finalKey[i]] = finalVal[i].replace(/\+|-/gmi, "")
@@ -584,8 +583,8 @@ client.on('message', async (msg) => {
             msg.reply("Pong!")
           break
 
-          case prefix + "debug":
-
+          case prefix + "whattime":
+            msg.reply("System time:\n" + masterTime)
           break
 
           case prefix + "whereis":
