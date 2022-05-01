@@ -126,7 +126,7 @@ async function resetExcel(msgFrom, isCron) {
       let dateNow = JSON.parse(fs.readFileSync("database/" + msgFrom + "/date.json"))
       let sumNow = JSON.parse(fs.readFileSync("database/" + msgFrom + "/master.json"))
       let actNow = JSON.parse(fs.readFileSync("database/" + msgFrom + "/action.json"))
-      let resetTimeLog = moment().tz("Israel").format("M_YY")
+      let resetTimeLog = moment().tz("Israel").subtract(1, "month").format("M_YY")
       fs.writeFileSync("database/" + msgFrom + "/old/Sum_" + resetTimeLog + ".json", JSON.stringify(sumNow))
       fs.writeFileSync("database/" + msgFrom + "/old/Date_" + resetTimeLog + ".json", JSON.stringify(dateNow))
       fs.writeFileSync("database/" + msgFrom + "/old/" + resetTimeLog + ".json", JSON.stringify(actNow))
@@ -221,6 +221,7 @@ client.on('message', async (msg) => {
       dateMaster.push(daDate)
       fs.writeFileSync("database/" + msg.from + "/date.json", JSON.stringify(dateMaster))
     }
+    // If master.json is empty, just plainly write it out
     if (userMaster == "") {
       for (let i = 0; i < dataKey.length; i++) {
         let tempData = {}
@@ -235,8 +236,15 @@ client.on('message', async (msg) => {
             // If exist a label, try to write on it
             // But if there's a -/+ sign, try to add it up
             if (/\+|\-/.test(dataVal[i])) {
-              let parsedMaster = parseInt(userMaster[j][daDate]) || 0
-              let parsedDataVal = parseInt(dataVal[i])
+              if (!userMaster[j][daDate]) {
+                // Pick latest date
+                let tmpDate = dateMaster
+                let latestDate = tmpDate.pop()
+                parsedMaster = parseInt(userMaster[j][latestDate]) || 0
+              } else {
+                parsedMaster = parseInt(userMaster[j][daDate]) || 0
+              }
+              let parsedDataVal = parseInt(dataVal[i]) || 0
               let res = parsedMaster + parsedDataVal
               let resString = res.toString()
               userMaster[j][daDate] = resString
@@ -483,69 +491,64 @@ client.on('message', async (msg) => {
     if (fs.existsSync("database/" + msg.from + "/master.json")) {
       let leMaster = JSON.parse(fs.readFileSync("database/" + msg.from + "/master.json"))
       let desc = JSON.parse(fs.readFileSync("database/" + msg.from + "/action.json"))
-      if (/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat) || /^!?להוסיף +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat)) {
+      if (/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat) || /^!?להוסיף!? +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm.test(lowerChat)) {
         if (lowerChat.includes("add")) {
           newLowerChat = lowerChat.match(/^add +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ')
           newLower = newLowerChat.replaceAll("add ", "").split(/\n/gm)
         } else if (lowerChat.includes("להוסיף")) {
           let bruh = []
-          newLowerChat = lowerChat.match(/^!?להוסיף +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ').split("\n")
+          newLowerChat = lowerChat.match(/^!?להוסיף!? +[^\s]+ +(\-|\+)?\d+( +[^\n]+)?\n?$/gm).join("\n").replace(/[^\S\r\n]+/g, ' ').split("\n")
           for (let things of newLowerChat) {
             bruh.push(toLTR(things))
           }
           let newBruh = bruh.join("\n")
-          newLower = newBruh.replaceAll(/ !?להוסיף/gmi, "").split(/\n/gm).map(x => x = x.split(" ").reverse().join(" "))
+          newLower = newBruh.replaceAll(/ !?להוסיף!?/gmi, "").split(/\n/gm).map(x => x = x.split(" ").reverse().join(" "))
         }
         let finalData = Object.fromEntries(newLower.map(x => x.split(" ")))
-        // If there's a +/- sign and there's no value, stop
-        var isContinue = false
+        // Check if there's a value before this. 
+        // If there is, add it up. If there is not, JUST FRICKIN STUFF THE VALUE IN THERE
         let finalKey = Object.keys(finalData)
         let finalVal = Object.values(finalData)
-        if (leMaster == "") {
-          // Special case
-          isContinue = true
-        }
         for (let i = 0; i < finalVal.length; i++) {
           if (/\+|\-/.test(finalVal[i])) {
             // Check if exist a value before this
+            if (leMaster.length == 0) {
+              // If master.json is empty
+              finalData[finalKey[i]] = finalVal[i].replace(/\+|-/gmi, "")
+              continue
+            }
             for (let j = 0; j < leMaster.length; j++) {
+              // This makes sure that a value before it exist before trying to input themselves
+              // If a value does not exist, simply strip the +/- sign
+              // ^ By doing this, erases possiblity of weird *2 input
               if (finalKey[i] == leMaster[j].List) {
-                if (!leMaster[j][masterTime] || leMaster[j][masterTime] == 0) {
-                  msg.reply("לתווית *" + finalKey[i] + "* אין ערך קודם.\nאנא אתחל תווית לפני שימוש בסימן  +/-")
-                  break
-                } else {
-                  isContinue = true
-                  break
-                }
+                isContinue = true
+                break
               } else if (j == leMaster.length-1) {
-                msg.reply("לתווית *" + finalKey[i] + "* אין ערך קודם.\nאנא אתחל תווית לפני שימוש בסימן  +/-")
+                finalData[finalKey[i]] = finalVal[i].replace(/\+|-/gmi, "")
               }
             }
-          } else {
-            isContinue = true
           }
         }
-        if (isContinue) {
-          if (finalData != {}) {
-            let moreNewLower = newLower.map(x => x.split(" "))
-            for (let desc of moreNewLower) {
-              desc.splice(0, 2)
-            }
-            // Desc is daDesc
-            let daDesc = moreNewLower.map(x => x.join(" "))
-            let actVal = Object.values(finalData)
-            let actKey = Object.keys(finalData)
-            for (let i = 0; i < actKey.length; i++) {
-              let actObj = {}
-              actObj.Date = masterTime
-              actObj.Label = actKey[i]
-              actObj.Value = actVal[i]
-              actObj.Desc = daDesc[i]
-              desc.push(actObj)
-            }
-            fs.writeFileSync("database/" + msg.from + "/action.json", JSON.stringify(desc))
-            inp(masterTime, finalData)
+        if (finalData != {}) {
+          let moreNewLower = newLower.map(x => x.split(" "))
+          for (let desc of moreNewLower) {
+            desc.splice(0, 2)
           }
+          // Desc is daDesc
+          let daDesc = moreNewLower.map(x => x.join(" "))
+          let actVal = Object.values(finalData)
+          let actKey = Object.keys(finalData)
+          for (let i = 0; i < actKey.length; i++) {
+            let actObj = {}
+            actObj.Date = masterTime
+            actObj.Label = actKey[i]
+            actObj.Value = actVal[i]
+            actObj.Desc = daDesc[i]
+            desc.push(actObj)
+          }
+          fs.writeFileSync("database/" + msg.from + "/action.json", JSON.stringify(desc))
+          inp(masterTime, finalData)
           msg.reply("המידע הוכנס בהצלחה")
         }
       } else if (/^remove [^\s]+\n?$/.test(lowerChat) || /^!?למחוק [^\s]+\n?$/.test(lowerChat)) {
@@ -579,6 +582,14 @@ client.on('message', async (msg) => {
           case "ping" + prefix:
           case prefix + 'ping':
             msg.reply("Pong!")
+          break
+
+          case prefix + "debug":
+
+          break
+
+          case prefix + "whereis":
+            msg.reply(msg.from)
           break
 
           case prefix + "help":
